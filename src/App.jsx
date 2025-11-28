@@ -146,7 +146,7 @@ const App = () => {
     if (!apiKey) {
         return (
             <div className="api-key-container">
-                <img src="/noxis-logo.jpg" alt="Noxis" className="api-key-logo" style={{ width: '280px', height: 'auto', marginBottom: '20px', borderRadius: '12px' }} />
+                <img src="/noxis-logo.svg" alt="Noxis" className="api-key-logo" style={{ width: '280px', height: 'auto', marginBottom: '24px' }} />
                 <h1 className="api-key-title" style={{ display: 'none' }}>Noxis</h1>
                 <input 
                     type="text" 
