@@ -143,6 +143,50 @@ const App = () => {
         return () => clearTimeout(timer);
     }, [searchQuery, apiKey]);
 
+    const [apiKeyInput, setApiKeyInput] = useState('');
+    const [validating, setValidating] = useState(false);
+    const [apiError, setApiError] = useState('');
+
+    const validateAndSetApiKey = async (key) => {
+        if (key.length < 10) return;
+        setValidating(true);
+        setApiError('');
+        try {
+            const response = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${key}&page=1`);
+            if (response.ok) {
+                localStorage.setItem('tmdb_api_key_v3', key);
+                setApiKey(key);
+            } else {
+                setApiError('Geçersiz API anahtarı. Lütfen kontrol edip tekrar deneyin.');
+            }
+        } catch (err) {
+            setApiError('Bağlantı hatası. Lütfen tekrar deneyin.');
+        }
+        setValidating(false);
+    };
+
+    const handleLogout = useCallback(() => {
+        localStorage.removeItem('tmdb_api_key_v3');
+        setApiKey(null);
+        setApiKeyInput('');
+        setApiError('');
+        setData({
+            hero: [], continue: [], 
+            trending: { results: [], page: 1, total_pages: 1 },
+            popularMovies: { results: [], page: 1, total_pages: 1 }, 
+            actionMovies: { results: [], page: 1, total_pages: 1 },
+            comedyMovies: { results: [], page: 1, total_pages: 1 }, 
+            horrorMovies: { results: [], page: 1, total_pages: 1 },
+            romanticMovies: { results: [], page: 1, total_pages: 1 }, 
+            scifiMovies: { results: [], page: 1, total_pages: 1 },
+            popularTV: { results: [], page: 1, total_pages: 1 }, 
+            crimeTV: { results: [], page: 1, total_pages: 1 },
+            comedyTV: { results: [], page: 1, total_pages: 1 }, 
+            dramaTV: { results: [], page: 1, total_pages: 1 }, 
+            scifiTV: { results: [], page: 1, total_pages: 1 }
+        });
+    }, []);
+
     if (!apiKey) {
         return (
             <div className="api-key-container">
@@ -150,16 +194,42 @@ const App = () => {
                 <h1 className="api-key-title" style={{ display: 'none' }}>Noxis</h1>
                 <input 
                     type="text" 
-                    onChange={e => { 
-                        if (e.target.value.length > 10) { 
-                            localStorage.setItem('tmdb_api_key_v3', e.target.value); 
-                            setApiKey(e.target.value); 
-                        } 
-                    }} 
+                    value={apiKeyInput}
+                    onChange={e => setApiKeyInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && validateAndSetApiKey(apiKeyInput)}
                     className="focusable api-key-input" 
                     placeholder="TMDB API Anahtarınızı Girin" 
                     autoFocus 
+                    disabled={validating}
                 />
+                <button 
+                    onClick={() => validateAndSetApiKey(apiKeyInput)}
+                    disabled={validating || apiKeyInput.length < 10}
+                    style={{
+                        marginTop: '16px',
+                        padding: '12px 32px',
+                        background: validating ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, rgba(138,43,226,0.8), rgba(75,0,130,0.8))',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: '12px',
+                        color: 'white',
+                        fontSize: '15px',
+                        fontWeight: '600',
+                        cursor: validating ? 'wait' : 'pointer',
+                        transition: 'all 0.3s ease'
+                    }}
+                >
+                    {validating ? 'Doğrulanıyor...' : 'Giriş Yap'}
+                </button>
+                {apiError && (
+                    <p style={{ 
+                        marginTop: '16px', 
+                        color: '#ff6b6b', 
+                        fontSize: '14px',
+                        textAlign: 'center'
+                    }}>
+                        {apiError}
+                    </p>
+                )}
                 <p style={{ 
                     marginTop: '24px', 
                     color: 'rgba(255,255,255,0.5)', 
@@ -184,7 +254,7 @@ const App = () => {
             color: 'white',
             overflow: 'hidden'
         }}>
-            <NavBar activeTab={activeTab} onTabChange={handleTabChange} />
+            <NavBar activeTab={activeTab} onTabChange={handleTabChange} onLogout={handleLogout} />
             <MobileNav activeTab={activeTab} onTabChange={handleTabChange} />
             
             {error && (
