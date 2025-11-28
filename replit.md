@@ -90,6 +90,14 @@ Apple TV+ benzeri modern bir film ve dizi izleme uygulaması (Türkçe).
 
 ## Son Değişiklikler (28 Kasım 2025)
 
+### NOXIS Rebrand ve MultiEmbed Kaynağı
+- Tüm StreamHub referansları NOXIS olarak güncellendi
+- package.json, manifest.json ve sw.js dosyaları güncellendi
+- Yeni NOXIS logosu ile PWA ikonları oluşturuldu (72x72 - 512x512)
+- Service Worker cache isimleri noxis- prefix'i ile güncellendi
+- MultiEmbed video kaynağı eklendi (varsayılan kaynak olarak ayarlandı)
+- Video kaynakları: MultiEmbed, VidSrc CC, VSrc SU, VidSrc Me, VidSrc Embed
+
 ### Filtreleme Sistemi
 - Keşfet sayfasına kapsamlı filtreleme sistemi eklendi
 - İçerik türü filtresi (Tümü, Film, Dizi)
