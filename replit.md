@@ -88,7 +88,14 @@ Apple TV+ benzeri modern bir film ve dizi izleme uygulaması.
 - Vurgu: #0a84ff (mavi), #30d158 (yeşil)
 - Glass: rgba(255, 255, 255, 0.08-0.15)
 
-## Son Değişiklikler (27 Kasım 2025)
+## Son Değişiklikler (28 Kasım 2025)
+
+- Çıkış butonu liquid glass efekti ile yeniden tasarlandı
+- Mobil navigasyon barına çıkış butonu eklendi
+- Mobil navbar liquid glass efekti ile güncellendi (masaüstü ile uyumlu)
+- Aktif sekme için glassmorphism stil efektleri eklendi
+
+## Önceki Değişiklikler (27 Kasım 2025)
 
 - Responsive CSS eklendi (mobil, tablet, PC, TV desteği)
 - Mobil için alt navigasyon barı eklendi
