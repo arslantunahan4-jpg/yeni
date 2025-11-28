@@ -192,7 +192,7 @@ iframe.focusable:focus {
 
 .nav-btn {
   font-size: 14px; 
-  font-weight: 600; 
+  font-weight: 700; 
   padding: 10px 20px; 
   border-radius: 24px;
   background: linear-gradient(
@@ -201,7 +201,7 @@ iframe.focusable:focus {
     rgba(255, 255, 255, 0.04) 50%,
     rgba(255, 255, 255, 0.08) 100%
   );
-  color: var(--text-secondary); 
+  color: white; 
   border: 1px solid rgba(255, 255, 255, 0.15);
   cursor: pointer; 
   transition: all 0.4s var(--transition-smooth);
@@ -211,6 +211,7 @@ iframe.focusable:focus {
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   box-shadow: 
     0 4px 16px rgba(0, 0, 0, 0.2),
+    0 0 15px rgba(255, 255, 255, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
     inset 0 -1px 0 rgba(255, 255, 255, 0.05);
 }
@@ -262,9 +263,10 @@ iframe.focusable:focus {
     rgba(255, 255, 255, 0.12) 100%
   );
   border-color: rgba(255, 255, 255, 0.25);
-  color: rgba(255, 255, 255, 0.9);
+  color: white;
   box-shadow: 
     0 6px 24px rgba(0, 0, 0, 0.25),
+    0 0 20px rgba(255, 255, 255, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.3),
     inset 0 -1px 0 rgba(255, 255, 255, 0.08);
 }
@@ -281,12 +283,13 @@ iframe.focusable:focus {
     rgba(255, 255, 255, 0.18) 100%
   );
   color: white;
+  font-weight: 700;
   border-color: rgba(255, 255, 255, 0.35);
   backdrop-filter: blur(25px) saturate(200%);
   -webkit-backdrop-filter: blur(25px) saturate(200%);
   box-shadow: 
     0 8px 32px rgba(0, 0, 0, 0.3),
-    0 0 20px rgba(255, 255, 255, 0.1),
+    0 0 25px rgba(255, 255, 255, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
     inset 0 -1px 0 rgba(255, 255, 255, 0.1);
 }
@@ -307,29 +310,32 @@ iframe.focusable:focus {
 .nav-btn:focus { 
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(255, 255, 255, 0.85) 100%
+    rgba(255, 255, 255, 0.32) 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.22) 100%
   ) !important;
-  color: black !important; 
-  transform: scale(1.08);
-  border-color: rgba(255, 255, 255, 0.6) !important;
+  color: white !important; 
+  font-weight: 700;
+  transform: scale(1.05);
+  border-color: rgba(255, 255, 255, 0.45) !important;
   box-shadow: 
-    0 8px 40px rgba(255, 255, 255, 0.3),
+    0 8px 32px rgba(0, 0, 0, 0.3),
     0 0 30px rgba(255, 255, 255, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .nav-btn:focus::before {
-  opacity: 0.3;
+  opacity: 1;
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.5) 0%,
-    transparent 100%
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0.1) 100%
   );
 }
 
 .nav-btn:focus::after {
-  opacity: 0;
+  opacity: 1;
 }
 
 .nav-profile {
