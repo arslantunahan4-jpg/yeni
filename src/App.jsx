@@ -21,12 +21,52 @@ const GENRE_TRANSLATIONS = {
     trending: 'Trend Olanlar'
 };
 
+const GENRES = {
+    movie: [
+        { id: 28, name: 'Aksiyon' }, { id: 12, name: 'Macera' }, { id: 16, name: 'Animasyon' },
+        { id: 35, name: 'Komedi' }, { id: 80, name: 'Suç' }, { id: 99, name: 'Belgesel' },
+        { id: 18, name: 'Dram' }, { id: 10751, name: 'Aile' }, { id: 14, name: 'Fantastik' },
+        { id: 36, name: 'Tarih' }, { id: 27, name: 'Korku' }, { id: 10402, name: 'Müzik' },
+        { id: 9648, name: 'Gizem' }, { id: 10749, name: 'Romantik' }, { id: 878, name: 'Bilim Kurgu' },
+        { id: 53, name: 'Gerilim' }, { id: 10752, name: 'Savaş' }, { id: 37, name: 'Western' }
+    ],
+    tv: [
+        { id: 10759, name: 'Aksiyon & Macera' }, { id: 16, name: 'Animasyon' }, { id: 35, name: 'Komedi' },
+        { id: 80, name: 'Suç' }, { id: 99, name: 'Belgesel' }, { id: 18, name: 'Dram' },
+        { id: 10751, name: 'Aile' }, { id: 10762, name: 'Çocuk' }, { id: 9648, name: 'Gizem' },
+        { id: 10763, name: 'Haber' }, { id: 10764, name: 'Reality' }, { id: 10765, name: 'Bilim Kurgu & Fantastik' },
+        { id: 10766, name: 'Pembe Dizi' }, { id: 10767, name: 'Talk Show' }, { id: 10768, name: 'Savaş & Politik' }, { id: 37, name: 'Western' }
+    ]
+};
+
+const SORT_OPTIONS = [
+    { id: 'popularity.desc', name: 'Popülerlik (Yüksek)' },
+    { id: 'popularity.asc', name: 'Popülerlik (Düşük)' },
+    { id: 'vote_average.desc', name: 'Puan (Yüksek)' },
+    { id: 'vote_average.asc', name: 'Puan (Düşük)' },
+    { id: 'primary_release_date.desc', name: 'Tarih (Yeni)' },
+    { id: 'primary_release_date.asc', name: 'Tarih (Eski)' }
+];
+
 const App = () => {
     const [apiKey, setApiKey] = useState(localStorage.getItem('tmdb_api_key_v3'));
     const [activeTab, setActiveTab] = useState('Ana Sayfa');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [error, setError] = useState(null);
+    
+    const [showFilters, setShowFilters] = useState(false);
+    const [filters, setFilters] = useState({
+        type: 'all',
+        genre: '',
+        minRating: 0,
+        sortBy: 'popularity.desc',
+        year: ''
+    });
+    const [discoverResults, setDiscoverResults] = useState([]);
+    const [discoverPage, setDiscoverPage] = useState(1);
+    const [discoverTotalPages, setDiscoverTotalPages] = useState(1);
+    const [isDiscoverLoading, setIsDiscoverLoading] = useState(false);
     const [data, setData] = useState({
         hero: [], 
         continue: [], 
@@ -135,13 +175,120 @@ const App = () => {
     useEffect(() => {
         const timer = setTimeout(() => { 
             if (searchQuery.length > 2) {
-                fetchTMDB(`/search/multi?query=${searchQuery}`, apiKey).then(d => d && setSearchResults(d.results || [])); 
+                fetchTMDB(`/search/multi?query=${searchQuery}`, apiKey).then(d => {
+                    if (d && d.results) {
+                        const resultsWithType = d.results.map(item => ({
+                            ...item,
+                            media_type: item.media_type || (item.first_air_date ? 'tv' : 'movie')
+                        }));
+                        setSearchResults(resultsWithType);
+                    }
+                }); 
             } else {
                 setSearchResults([]); 
             }
         }, 500);
         return () => clearTimeout(timer);
     }, [searchQuery, apiKey]);
+
+    const discoverContent = useCallback(async (page = 1, resetResults = true) => {
+        if (!apiKey) return;
+        setIsDiscoverLoading(true);
+        
+        const buildParams = (type) => {
+            let params = [];
+            
+            const sortBy = type === 'tv' 
+                ? filters.sortBy.replace('primary_release_date', 'first_air_date')
+                : filters.sortBy;
+            params.push(`sort_by=${sortBy}`);
+            
+            if (filters.minRating > 0) {
+                params.push(`vote_average.gte=${filters.minRating}`);
+                params.push('vote_count.gte=100');
+            }
+            
+            if (filters.year) {
+                if (type === 'tv') {
+                    params.push(`first_air_date_year=${filters.year}`);
+                } else {
+                    params.push(`primary_release_year=${filters.year}`);
+                }
+            }
+            
+            if (filters.genre) {
+                params.push(`with_genres=${filters.genre}`);
+            }
+            
+            return params.join('&');
+        };
+        
+        if (filters.type === 'movie') {
+            const res = await fetchTMDB(`/discover/movie?${buildParams('movie')}&page=${page}`, apiKey);
+            if (res) {
+                const results = (res.results || []).map(item => ({ ...item, media_type: 'movie' }));
+                setDiscoverResults(resetResults ? results : prev => [...prev, ...results]);
+                setDiscoverPage(page);
+                setDiscoverTotalPages(res.total_pages || 1);
+            }
+        } else if (filters.type === 'tv') {
+            const res = await fetchTMDB(`/discover/tv?${buildParams('tv')}&page=${page}`, apiKey);
+            if (res) {
+                const results = (res.results || []).map(item => ({ ...item, media_type: 'tv' }));
+                setDiscoverResults(resetResults ? results : prev => [...prev, ...results]);
+                setDiscoverPage(page);
+                setDiscoverTotalPages(res.total_pages || 1);
+            }
+        } else {
+            const [movieRes, tvRes] = await Promise.all([
+                fetchTMDB(`/discover/movie?${buildParams('movie')}&page=${page}`, apiKey),
+                fetchTMDB(`/discover/tv?${buildParams('tv')}&page=${page}`, apiKey)
+            ]);
+            
+            const movies = (movieRes?.results || []).map(m => ({ ...m, media_type: 'movie' }));
+            const tvShows = (tvRes?.results || []).map(t => ({ ...t, media_type: 'tv' }));
+            const combined = [...movies, ...tvShows].sort((a, b) => {
+                if (filters.sortBy.includes('popularity')) {
+                    return filters.sortBy.includes('desc') ? b.popularity - a.popularity : a.popularity - b.popularity;
+                }
+                if (filters.sortBy.includes('vote_average')) {
+                    return filters.sortBy.includes('desc') ? b.vote_average - a.vote_average : a.vote_average - b.vote_average;
+                }
+                if (filters.sortBy.includes('primary_release_date') || filters.sortBy.includes('first_air_date') || filters.sortBy.includes('release_date')) {
+                    const dateA = new Date(a.release_date || a.first_air_date || '1900-01-01');
+                    const dateB = new Date(b.release_date || b.first_air_date || '1900-01-01');
+                    return filters.sortBy.includes('desc') ? dateB - dateA : dateA - dateB;
+                }
+                return 0;
+            });
+            
+            setDiscoverResults(resetResults ? combined : prev => [...prev, ...combined]);
+            setDiscoverPage(page);
+            setDiscoverTotalPages(Math.max(movieRes?.total_pages || 1, tvRes?.total_pages || 1));
+        }
+        setIsDiscoverLoading(false);
+    }, [apiKey, filters]);
+
+    useEffect(() => {
+        if (activeTab === 'Ara' && !searchQuery) {
+            discoverContent(1, true);
+        }
+    }, [filters, activeTab, discoverContent, searchQuery]);
+
+    const handleFilterChange = useCallback((key, value) => {
+        setFilters(prev => ({ ...prev, [key]: value }));
+        setDiscoverPage(1);
+    }, []);
+
+    const clearFilters = useCallback(() => {
+        setFilters({
+            type: 'all',
+            genre: '',
+            minRating: 0,
+            sortBy: 'popularity.desc',
+            year: ''
+        });
+    }, []);
 
     const [apiKeyInput, setApiKeyInput] = useState('');
     const [validating, setValidating] = useState(false);
@@ -364,22 +511,30 @@ const App = () => {
                         {activeTab === 'Ara' && (
                             <div>
                                 <div style={{ padding: '24px 16px 16px 16px' }}>
-                                    <h1 style={{ 
-                                        fontSize: '28px', 
-                                        fontWeight: '800', 
-                                        marginBottom: '16px',
-                                        letterSpacing: '-0.02em',
-                                        background: 'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.8) 100%)',
-                                        WebkitBackgroundClip: 'text',
-                                        WebkitTextFillColor: 'transparent',
-                                        backgroundClip: 'text'
-                                    }}>
-                                        Ara
-                                    </h1>
-                                    <div className="search-input-container">
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                                        <h1 style={{ 
+                                            fontSize: '28px', 
+                                            fontWeight: '800', 
+                                            letterSpacing: '-0.02em',
+                                            background: 'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.8) 100%)',
+                                            WebkitBackgroundClip: 'text',
+                                            WebkitTextFillColor: 'transparent',
+                                            backgroundClip: 'text'
+                                        }}>
+                                            Keşfet
+                                        </h1>
+                                        <button 
+                                            onClick={() => setShowFilters(!showFilters)}
+                                            className="filter-toggle-btn"
+                                        >
+                                            <i className={`fas fa-${showFilters ? 'times' : 'sliders-h'}`}></i>
+                                            <span>{showFilters ? 'Kapat' : 'Filtrele'}</span>
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="search-input-container" style={{ marginBottom: '16px' }}>
                                         <i className="fas fa-search search-icon"></i>
                                         <input 
-                                            autoFocus 
                                             type="text" 
                                             className="focusable search-input" 
                                             placeholder="Film, dizi veya oyuncu ara..." 
@@ -387,10 +542,109 @@ const App = () => {
                                             onChange={e => setSearchQuery(e.target.value)} 
                                         />
                                     </div>
+                                    
+                                    {showFilters && !searchQuery && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            className="filter-panel"
+                                        >
+                                            <div className="filter-row">
+                                                <div className="filter-group">
+                                                    <label className="filter-label">Tür</label>
+                                                    <div className="filter-chips">
+                                                        {[
+                                                            { id: 'all', name: 'Tümü' },
+                                                            { id: 'movie', name: 'Film' },
+                                                            { id: 'tv', name: 'Dizi' }
+                                                        ].map(t => (
+                                                            <button 
+                                                                key={t.id}
+                                                                onClick={() => handleFilterChange('type', t.id)}
+                                                                className={`filter-chip ${filters.type === t.id ? 'active' : ''}`}
+                                                            >
+                                                                {t.name}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="filter-group">
+                                                    <label className="filter-label">Kategori</label>
+                                                    <select 
+                                                        value={filters.genre}
+                                                        onChange={e => handleFilterChange('genre', e.target.value)}
+                                                        className="filter-select"
+                                                    >
+                                                        <option value="">Tüm Kategoriler</option>
+                                                        {(filters.type === 'tv' ? GENRES.tv : GENRES.movie).map(g => (
+                                                            <option key={g.id} value={g.id}>{g.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="filter-row">
+                                                <div className="filter-group">
+                                                    <label className="filter-label">Min. Puan: {filters.minRating > 0 ? filters.minRating.toFixed(1) : 'Tümü'}</label>
+                                                    <input 
+                                                        type="range"
+                                                        min="0"
+                                                        max="9"
+                                                        step="0.5"
+                                                        value={filters.minRating}
+                                                        onChange={e => handleFilterChange('minRating', parseFloat(e.target.value))}
+                                                        className="filter-range"
+                                                    />
+                                                    <div className="range-labels">
+                                                        <span>0</span>
+                                                        <span>5</span>
+                                                        <span>9+</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="filter-group">
+                                                    <label className="filter-label">Yıl</label>
+                                                    <select 
+                                                        value={filters.year}
+                                                        onChange={e => handleFilterChange('year', e.target.value)}
+                                                        className="filter-select"
+                                                    >
+                                                        <option value="">Tüm Yıllar</option>
+                                                        {Array.from({ length: 50 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                                                            <option key={y} value={y}>{y}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                
+                                                <div className="filter-group">
+                                                    <label className="filter-label">Sıralama</label>
+                                                    <select 
+                                                        value={filters.sortBy}
+                                                        onChange={e => handleFilterChange('sortBy', e.target.value)}
+                                                        className="filter-select"
+                                                    >
+                                                        {SORT_OPTIONS.map(s => (
+                                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="filter-actions">
+                                                <button onClick={clearFilters} className="filter-clear-btn">
+                                                    <i className="fas fa-undo"></i>
+                                                    Filtreleri Temizle
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    )}
                                 </div>
-                                {searchQuery.length > 2 && (
+                                
+                                {searchQuery.length > 2 ? (
                                     <div className="search-grid">
-                                        {searchResults.map(m => m.poster_path && (
+                                        {searchResults.filter(m => m.poster_path).map(m => (
                                             <button 
                                                 key={m.id} 
                                                 tabIndex="0" 
@@ -401,8 +655,63 @@ const App = () => {
                                                     src={POSTER_IMG + m.poster_path} 
                                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                                                 />
+                                                <div className="card-rating">
+                                                    <i className="fas fa-star"></i>
+                                                    {(m.vote_average || 0).toFixed(1)}
+                                                </div>
+                                                <div className="card-overlay">
+                                                    <span className="card-title">{m.title || m.name}</span>
+                                                </div>
                                             </button>
                                         ))}
+                                    </div>
+                                ) : (
+                                    <div className="search-grid">
+                                        {isDiscoverLoading && discoverResults.length === 0 ? (
+                                            Array.from({ length: 12 }).map((_, i) => (
+                                                <div key={i} className="skeleton search-grid-card"></div>
+                                            ))
+                                        ) : (
+                                            <>
+                                                {discoverResults.filter(m => m.poster_path).map(m => (
+                                                    <button 
+                                                        key={`${m.id}-${m.media_type}`} 
+                                                        tabIndex="0" 
+                                                        onClick={() => openDetail(m)} 
+                                                        className="focusable poster-card search-grid-card"
+                                                    >
+                                                        <SmartImage 
+                                                            src={POSTER_IMG + m.poster_path} 
+                                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                        />
+                                                        <div className="card-rating">
+                                                            <i className="fas fa-star"></i>
+                                                            {(m.vote_average || 0).toFixed(1)}
+                                                        </div>
+                                                        <div className="card-type-badge">
+                                                            {m.media_type === 'tv' ? 'Dizi' : 'Film'}
+                                                        </div>
+                                                        <div className="card-overlay">
+                                                            <span className="card-title">{m.title || m.name}</span>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                                {discoverPage < discoverTotalPages && (
+                                                    <button 
+                                                        onClick={() => discoverContent(discoverPage + 1, false)}
+                                                        className="focusable load-more-card search-grid-card"
+                                                        disabled={isDiscoverLoading}
+                                                    >
+                                                        <div className="load-more-icon">
+                                                            <i className={`fas fa-${isDiscoverLoading ? 'spinner fa-spin' : 'plus'}`}></i>
+                                                        </div>
+                                                        <span style={{ fontSize: '14px', fontWeight: '600' }}>
+                                                            {isDiscoverLoading ? 'Yükleniyor...' : 'Daha Fazla'}
+                                                        </span>
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -417,7 +726,8 @@ const App = () => {
                         movie={selectedMovie} 
                         apiKey={apiKey} 
                         onClose={handleCloseUI} 
-                        onPlay={openPlayer} 
+                        onPlay={openPlayer}
+                        onOpenDetail={openDetail}
                     />
                 )}
             </AnimatePresence>

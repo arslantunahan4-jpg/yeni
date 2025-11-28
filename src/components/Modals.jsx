@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SmartImage, ORIGINAL_IMG, BACKDROP_IMG, POSTER_IMG } from './Shared';
 import { fetchTMDB, isWatched, markAsWatched, saveContinueWatching } from '../hooks/useAppLogic';
 
-export const DetailModal = ({ movie, onClose, onPlay, apiKey }) => {
+export const DetailModal = ({ movie, onClose, onPlay, onOpenDetail, apiKey }) => {
     const [details, setDetails] = useState(null);
     const [seasons, setSeasons] = useState([]);
     const [episodes, setEpisodes] = useState([]);
@@ -265,10 +265,15 @@ export const DetailModal = ({ movie, onClose, onPlay, apiKey }) => {
                                         key={s.id} 
                                         tabIndex="0" 
                                         onClick={() => {
+                                            const similarItem = {
+                                                ...s,
+                                                media_type: isSeries ? 'tv' : 'movie'
+                                            };
                                             onClose(); 
                                             setTimeout(() => {
-                                                setDetails(null); 
-                                                onPlay(s, 1, 1);
+                                                if (onOpenDetail) {
+                                                    onOpenDetail(similarItem);
+                                                }
                                             }, 300);
                                         }} 
                                         className="focusable poster-card card-portrait"
@@ -277,6 +282,9 @@ export const DetailModal = ({ movie, onClose, onPlay, apiKey }) => {
                                             src={POSTER_IMG + s.poster_path} 
                                             style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                                         />
+                                        <div className="card-overlay">
+                                            <span className="card-title">{s.title || s.name}</span>
+                                        </div>
                                     </button>
                                 ))}
                             </div>
