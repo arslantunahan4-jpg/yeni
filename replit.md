@@ -1,0 +1,99 @@
+# StreamHub TV+
+
+Apple TV+ benzeri modern bir film ve dizi izleme uygulaması.
+
+## Proje Yapısı
+
+```
+├── src/
+│   ├── components/
+│   │   ├── HomeWidgets.jsx    # Hero carousel ve satır bileşenleri
+│   │   ├── Modals.jsx         # Detay modal ve video oynatıcı
+│   │   └── Shared.jsx         # Ortak bileşenler (NavBar, MobileNav, Card, SmartImage)
+│   ├── hooks/
+│   │   └── useAppLogic.js     # TV navigasyon, API ve depolama hook'ları
+│   ├── assets/                # Statik görsel dosyaları
+│   ├── App.jsx                # Ana uygulama bileşeni
+│   ├── main.jsx               # React giriş noktası
+│   └── index.css              # Responsive CSS stilleri
+├── public/
+│   ├── icons/                 # PWA ikonları (72x72 - 512x512)
+│   ├── manifest.json          # PWA manifest dosyası
+│   ├── sw.js                  # Service Worker
+│   └── favicon.ico            # Site ikonu
+├── index.html                 # HTML şablonu (PWA meta tag'leri)
+├── vite.config.js             # Vite yapılandırması
+└── package.json               # Proje bağımlılıkları
+```
+
+## Özellikler
+
+### Temel Özellikler
+- Apple TV+ esintili Liquid Glass/Frosted Glass tasarım
+- TMDB API entegrasyonu (film ve dizi verileri)
+- TV uzaktan kumanda ve gamepad desteği
+- Akıllı fare kontrolü (otomatik gizleme)
+- İzleme geçmişi ve devam etme özelliği
+- Çoklu video kaynağı desteği
+- Duyarlı animasyonlar (Framer Motion)
+- Türkçe arayüz
+
+### Responsive Tasarım
+- **Mobil (≤768px)**: Alt navigasyon barı, optimize edilmiş kartlar, touch-friendly UI
+- **Tablet (769-1024px)**: Orta boyut kartlar, üst navigasyon
+- **Masaüstü (1025-1600px)**: Tam boyut UI, üst navigasyon
+- **TV (>1600px)**: vw-based font boyutları, TV optimizasyonu
+
+### PWA (Progressive Web App)
+- Cihaza yüklenebilir uygulama
+- Offline önbellek desteği
+- iOS ve Android ana ekran ikonu
+- Standalone uygulama modu
+- Service Worker ile dinamik önbellekleme
+
+## Teknolojiler
+
+- React 18
+- Vite 5
+- Framer Motion
+- Font Awesome
+- TMDB API
+- PWA (Service Worker, Web App Manifest)
+
+## Kullanım
+
+1. Uygulamayı başlatın
+2. TMDB API anahtarınızı girin (themoviedb.org'dan alınabilir)
+3. Film ve dizi içeriklerini keşfedin
+4. Mobilde: Alt navigasyon çubuğunu kullanın
+5. PWA: Tarayıcıdan "Ana Ekrana Ekle" ile yükleyin
+
+## Tasarım
+
+### Responsive Breakpoints
+- Mobil: max-width 768px (16px base font)
+- Tablet: 769-1024px (14px base font)
+- Masaüstü: 1025-1600px (15px base font)
+- TV: 1601px+ (0.85vw base font)
+
+### Bileşenler
+- Navbar: Masaüstünde üstte, mobilde gizli
+- MobileNav: Mobilde altta, masaüstünde gizli
+- Kartlar: Responsive genişlik (140px mobil → 14rem TV)
+- Hero: 50vh mobil → 70vh TV
+
+### Renk Paleti
+- Arka plan: #000000
+- Metin: #f5f5f7
+- Vurgu: #0a84ff (mavi), #30d158 (yeşil)
+- Glass: rgba(255, 255, 255, 0.08-0.15)
+
+## Son Değişiklikler (27 Kasım 2025)
+
+- Responsive CSS eklendi (mobil, tablet, PC, TV desteği)
+- Mobil için alt navigasyon barı eklendi
+- PWA desteği eklendi (manifest.json, Service Worker)
+- PWA ikonları oluşturuldu (72x72 - 512x512)
+- index.html PWA meta tag'leri ile güncellendi
+- Tüm bileşenler mobil uyumlu hale getirildi
+- CSS medya sorguları ile cihaz bazlı stil optimizasyonu
