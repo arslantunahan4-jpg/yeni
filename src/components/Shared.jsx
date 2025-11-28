@@ -1,4 +1,4 @@
-import React, { memo, useState } from 'react';
+import React, { memo, useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { isWatched } from '../hooks/useAppLogic';
 
 export const BASE_IMG = "https://image.tmdb.org/t/p/w500";
@@ -58,29 +58,122 @@ const NAV_ITEMS = [
     { id: 'Ara', icon: 'fas fa-search', label: 'Ara' }
 ];
 
-export const NavBar = memo(({ activeTab, onTabChange }) => (
-    <nav className="navbar-container">
-        <div className="nav-logo">
-            <i className="fab fa-apple"></i>
-            <span>tv+</span>
-        </div>
+export const NavBar = memo(({ activeTab, onTabChange }) => {
+    const menuRef = useRef(null);
+    const buttonsRef = useRef({});
+    const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0, opacity: 0 });
+    const [hoveredTab, setHoveredTab] = useState(null);
+
+    useLayoutEffect(() => {
+        const updateIndicator = (tabId) => {
+            const button = buttonsRef.current[tabId];
+            const menu = menuRef.current;
+            if (button && menu) {
+                const menuRect = menu.getBoundingClientRect();
+                const buttonRect = button.getBoundingClientRect();
+                setIndicatorStyle({
+                    left: buttonRect.left - menuRect.left,
+                    width: buttonRect.width,
+                    opacity: 1
+                });
+            }
+        };
         
-        <div className="nav-menu">
-            {NAV_ITEMS.map(item => (
-                <button 
-                    key={item.id} 
-                    tabIndex="0" 
-                    onClick={() => onTabChange(item.id)} 
-                    className={`focusable nav-btn ${activeTab === item.id ? 'btn-active' : ''}`}
+        const targetTab = hoveredTab || activeTab;
+        updateIndicator(targetTab);
+    }, [activeTab, hoveredTab]);
+
+    const getButtonScale = (itemId) => {
+        const targetTab = hoveredTab || activeTab;
+        if (itemId === targetTab) return 1.02;
+        
+        const targetIndex = NAV_ITEMS.findIndex(i => i.id === targetTab);
+        const currentIndex = NAV_ITEMS.findIndex(i => i.id === itemId);
+        const distance = Math.abs(targetIndex - currentIndex);
+        
+        if (distance === 1) return 0.97;
+        return 0.94;
+    };
+
+    const getButtonOpacity = (itemId) => {
+        const targetTab = hoveredTab || activeTab;
+        if (itemId === targetTab) return 1;
+        
+        const targetIndex = NAV_ITEMS.findIndex(i => i.id === targetTab);
+        const currentIndex = NAV_ITEMS.findIndex(i => i.id === itemId);
+        const distance = Math.abs(targetIndex - currentIndex);
+        
+        if (distance === 1) return 0.7;
+        return 0.5;
+    };
+
+    return (
+        <nav className="navbar-container">
+            <div className="nav-logo">
+                <i className="fab fa-apple"></i>
+                <span>tv+</span>
+            </div>
+            
+            <div className="nav-menu" ref={menuRef}>
+                <div 
+                    className="nav-indicator"
+                    style={{
+                        position: 'absolute',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        left: indicatorStyle.left,
+                        width: indicatorStyle.width,
+                        height: 'calc(100% - 8px)',
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.14) 100%)',
+                        borderRadius: '20px',
+                        border: '1.5px solid rgba(255,255,255,0.35)',
+                        boxShadow: '0 0 25px rgba(255,255,255,0.15), inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(255,255,255,0.1)',
+                        transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                        opacity: indicatorStyle.opacity,
+                        pointerEvents: 'none',
+                        zIndex: 0,
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)'
+                    }}
                 >
-                    {item.label}
-                </button>
-            ))}
-        </div>
-        
-        <div className="nav-profile"></div>
-    </nav>
-));
+                    <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: '50%',
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.35) 0%, transparent 100%)',
+                        borderRadius: '20px 20px 100px 100px',
+                        pointerEvents: 'none'
+                    }} />
+                </div>
+                
+                {NAV_ITEMS.map(item => (
+                    <button 
+                        key={item.id}
+                        ref={el => buttonsRef.current[item.id] = el}
+                        tabIndex="0" 
+                        onClick={() => onTabChange(item.id)}
+                        onMouseEnter={() => setHoveredTab(item.id)}
+                        onMouseLeave={() => setHoveredTab(null)}
+                        className="focusable nav-btn"
+                        style={{
+                            transform: `scale(${getButtonScale(item.id)})`,
+                            opacity: getButtonOpacity(item.id),
+                            color: (hoveredTab === item.id || activeTab === item.id) ? 'white' : 'rgba(255,255,255,0.65)',
+                            fontWeight: (hoveredTab === item.id || activeTab === item.id) ? 700 : 600,
+                            zIndex: 1
+                        }}
+                    >
+                        {item.label}
+                    </button>
+                ))}
+            </div>
+            
+            <div className="nav-profile"></div>
+        </nav>
+    );
+});
 
 export const MobileNav = memo(({ activeTab, onTabChange }) => (
     <nav className="mobile-nav">
