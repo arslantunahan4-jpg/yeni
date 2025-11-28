@@ -1,7 +1,7 @@
 const CACHE_VERSION = 'v1';
-const STATIC_CACHE = `streamhub-static-${CACHE_VERSION}`;
-const DYNAMIC_CACHE = `streamhub-dynamic-${CACHE_VERSION}`;
-const API_CACHE = `streamhub-api-${CACHE_VERSION}`;
+const STATIC_CACHE = `noxis-static-${CACHE_VERSION}`;
+const DYNAMIC_CACHE = `noxis-dynamic-${CACHE_VERSION}`;
+const API_CACHE = `noxis-api-${CACHE_VERSION}`;
 
 const STATIC_ASSETS = [
   './',
@@ -30,7 +30,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames
           .filter((name) => {
-            return name.startsWith('streamhub-') && 
+            return name.startsWith('noxis-') && 
                    name !== STATIC_CACHE && 
                    name !== DYNAMIC_CACHE && 
                    name !== API_CACHE;

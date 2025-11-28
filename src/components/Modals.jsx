@@ -321,12 +321,13 @@ export const DetailModal = ({ movie, onClose, onPlay, onOpenDetail, apiKey }) =>
 };
 
 export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
-    const [source, setSource] = useState('vidsrc.cc');
+    const [source, setSource] = useState('multiembed');
     const [showControls, setShowControls] = useState(true);
     const controlsTimeout = useRef(null);
     const isSeries = movie.media_type === 'tv' || movie.first_air_date;
     
     const SOURCES = [
+        { id: 'multiembed', name: 'MultiEmbed' },
         { id: 'vidsrc.cc', name: 'VidSrc CC' }, 
         { id: 'vsrc.su', name: 'VSrc SU' }, 
         { id: 'vidsrcme.ru', name: 'VidSrc Me' }, 
@@ -334,7 +335,11 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     ];
     
     const getUrl = useCallback(() => {
-        if (source === 'vidsrc.cc') {
+        if (source === 'multiembed') {
+            return isSeries 
+                ? `https://multiembed.mov/directstream.php?video_id=${movie.id}&tmdb=1&s=${initialSeason}&e=${initialEpisode}` 
+                : `https://multiembed.mov/directstream.php?video_id=${movie.id}&tmdb=1`;
+        } else if (source === 'vidsrc.cc') {
             return isSeries 
                 ? `https://vidsrc.cc/v2/embed/tv/${movie.id}/${initialSeason}/${initialEpisode}` 
                 : `https://vidsrc.cc/v2/embed/movie/${movie.id}`;

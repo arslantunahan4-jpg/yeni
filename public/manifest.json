@@ -1,6 +1,6 @@
 {
-  "name": "StreamHub TV+",
-  "short_name": "StreamHub",
+  "name": "NOXIS",
+  "short_name": "NOXIS",
   "description": "Film ve dizi izleme uygulaması",
   "start_url": "/",
   "display": "standalone",
