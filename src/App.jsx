@@ -146,8 +146,8 @@ const App = () => {
     if (!apiKey) {
         return (
             <div className="api-key-container">
-                <i className="fab fa-apple api-key-logo"></i>
-                <h1 className="api-key-title">StreamHub TV+</h1>
+                <img src="/noxis-logo.jpg" alt="Noxis" className="api-key-logo" style={{ width: '280px', height: 'auto', marginBottom: '20px', borderRadius: '12px' }} />
+                <h1 className="api-key-title" style={{ display: 'none' }}>Noxis</h1>
                 <input 
                     type="text" 
                     onChange={e => { 

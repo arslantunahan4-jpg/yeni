@@ -110,8 +110,7 @@ export const NavBar = memo(({ activeTab, onTabChange }) => {
     return (
         <nav className="navbar-container">
             <div className="nav-logo">
-                <i className="fab fa-apple"></i>
-                <span>tv+</span>
+                <img src="/noxis-logo.jpg" alt="Noxis" style={{ height: '32px', width: 'auto', borderRadius: '6px' }} />
             </div>
             
             <div className="nav-menu" ref={menuRef}>
