@@ -1,6 +1,6 @@
-# StreamHub TV+
+# NOXIS
 
-Apple TV+ benzeri modern bir film ve dizi izleme uygulaması.
+Apple TV+ benzeri modern bir film ve dizi izleme uygulaması (Türkçe).
 
 ## Proje Yapısı
 
@@ -90,6 +90,21 @@ Apple TV+ benzeri modern bir film ve dizi izleme uygulaması.
 
 ## Son Değişiklikler (28 Kasım 2025)
 
+### Filtreleme Sistemi
+- Keşfet sayfasına kapsamlı filtreleme sistemi eklendi
+- İçerik türü filtresi (Tümü, Film, Dizi)
+- Tür (Genre) filtresi - TMDB'den dinamik olarak çekiliyor
+- Minimum IMDB puanı filtresi (6, 7, 8, 9 ve üzeri)
+- Yıl aralığı filtresi
+- Sıralama seçenekleri (popülerlik, puan, tarih - artan/azalan)
+- Liquid glass tasarımıyla uyumlu filtre UI
+
+### Benzer İçerikler
+- Benzer içerikler bölümü düzeltildi - TMDB API'den gerçek benzer içerikler
+- Tıklandığında detay sayfası açılıyor (otomatik oynatma yerine)
+- media_type düzgün şekilde aktarılıyor
+
+### Önceki Güncellemeler (28 Kasım 2025)
 - Çıkış butonu liquid glass efekti ile yeniden tasarlandı
 - Mobil navigasyon barına çıkış butonu eklendi
 - Mobil navbar liquid glass efekti ile güncellendi (masaüstü ile uyumlu)
