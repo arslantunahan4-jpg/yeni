@@ -171,36 +171,10 @@ export const NavBar = memo(({ activeTab, onTabChange, onLogout }) => {
                 {onLogout && (
                     <button 
                         onClick={onLogout}
-                        className="logout-btn"
+                        className="nav-logout-btn"
                         title="Çıkış Yap"
-                        style={{
-                            background: 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)',
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            borderRadius: '12px',
-                            padding: '8px 16px',
-                            color: 'rgba(255,255,255,0.7)',
-                            fontSize: '13px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            transition: 'all 0.2s ease',
-                            backdropFilter: 'blur(10px)'
-                        }}
-                        onMouseEnter={e => {
-                            e.target.style.background = 'linear-gradient(180deg, rgba(255,100,100,0.2) 0%, rgba(255,100,100,0.1) 100%)';
-                            e.target.style.borderColor = 'rgba(255,100,100,0.3)';
-                            e.target.style.color = '#ff6b6b';
-                        }}
-                        onMouseLeave={e => {
-                            e.target.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)';
-                            e.target.style.borderColor = 'rgba(255,255,255,0.12)';
-                            e.target.style.color = 'rgba(255,255,255,0.7)';
-                        }}
                     >
-                        <i className="fas fa-sign-out-alt"></i>
-                        <span>Çıkış</span>
+                        <i className="fas fa-power-off"></i>
                     </button>
                 )}
             </div>
