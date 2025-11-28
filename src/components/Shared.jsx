@@ -182,7 +182,7 @@ export const NavBar = memo(({ activeTab, onTabChange, onLogout }) => {
     );
 });
 
-export const MobileNav = memo(({ activeTab, onTabChange }) => (
+export const MobileNav = memo(({ activeTab, onTabChange, onLogout }) => (
     <nav className="mobile-nav">
         {NAV_ITEMS.map(item => (
             <button 
@@ -194,6 +194,16 @@ export const MobileNav = memo(({ activeTab, onTabChange }) => (
                 <span>{item.label}</span>
             </button>
         ))}
+        {onLogout && (
+            <button 
+                onClick={onLogout}
+                className="mobile-nav-btn mobile-logout-btn"
+                title="Çıkış Yap"
+            >
+                <i className="fas fa-power-off"></i>
+                <span>Çıkış</span>
+            </button>
+        )}
     </nav>
 ));
 

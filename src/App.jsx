@@ -255,7 +255,7 @@ const App = () => {
             overflow: 'hidden'
         }}>
             <NavBar activeTab={activeTab} onTabChange={handleTabChange} onLogout={handleLogout} />
-            <MobileNav activeTab={activeTab} onTabChange={handleTabChange} />
+            <MobileNav activeTab={activeTab} onTabChange={handleTabChange} onLogout={handleLogout} />
             
             {error && (
                 <div style={{ 
