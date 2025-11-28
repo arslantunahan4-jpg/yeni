@@ -119,21 +119,19 @@ export const NavBar = memo(({ activeTab, onTabChange }) => {
                     className="nav-indicator"
                     style={{
                         position: 'absolute',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
+                        top: '4px',
+                        bottom: '4px',
                         left: indicatorStyle.left,
                         width: indicatorStyle.width,
-                        height: 'calc(100% - 8px)',
-                        background: 'linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.14) 100%)',
-                        borderRadius: '20px',
-                        border: '1.5px solid rgba(255,255,255,0.35)',
-                        boxShadow: '0 0 25px rgba(255,255,255,0.15), inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(255,255,255,0.1)',
-                        transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.12) 100%)',
+                        borderRadius: '18px',
+                        border: '1px solid rgba(255,255,255,0.30)',
+                        boxShadow: '0 0 20px rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.25)',
+                        transition: 'left 0.35s cubic-bezier(0.4, 0, 0.2, 1), width 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease',
                         opacity: indicatorStyle.opacity,
                         pointerEvents: 'none',
                         zIndex: 0,
-                        backdropFilter: 'blur(10px)',
-                        WebkitBackdropFilter: 'blur(10px)'
+                        overflow: 'hidden'
                     }}
                 >
                     <div style={{
@@ -141,9 +139,9 @@ export const NavBar = memo(({ activeTab, onTabChange }) => {
                         top: 0,
                         left: 0,
                         right: 0,
-                        height: '50%',
-                        background: 'linear-gradient(180deg, rgba(255,255,255,0.35) 0%, transparent 100%)',
-                        borderRadius: '20px 20px 100px 100px',
+                        height: '45%',
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.30) 0%, transparent 100%)',
+                        borderRadius: '18px 18px 50% 50%',
                         pointerEvents: 'none'
                     }} />
                 </div>
