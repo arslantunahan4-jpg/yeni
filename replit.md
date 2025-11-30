@@ -8,6 +8,7 @@ Apple TV+ benzeri modern bir film ve dizi izleme uygulaması (Türkçe).
 ├── src/
 │   ├── components/
 │   │   ├── HomeWidgets.jsx    # Hero carousel ve satır bileşenleri
+│   │   ├── IntroAnimation.jsx # Sinematik açılış animasyonu (The Genesis Sequence)
 │   │   ├── Modals.jsx         # Detay modal ve video oynatıcı
 │   │   └── Shared.jsx         # Ortak bileşenler (NavBar, MobileNav, Card, SmartImage)
 │   ├── hooks/
@@ -88,7 +89,24 @@ Apple TV+ benzeri modern bir film ve dizi izleme uygulaması (Türkçe).
 - Vurgu: #0a84ff (mavi), #30d158 (yeşil)
 - Glass: rgba(255, 255, 255, 0.08-0.15)
 
-## Son Değişiklikler (28 Kasım 2025)
+## Son Değişiklikler (30 Kasım 2025)
+
+### NOXIS Sinematik İntro Animasyonu (The Genesis Sequence)
+- Yeni sinematik açılış sekansı eklendi (~12 saniye)
+- 4 aşamalı animasyon:
+  - Aşama 1 (0-2s): Karanlık ekranda leylak rengi neon kıvılcım
+  - Aşama 2 (2-5s): Glassmorphism geometrik şekiller DNA gibi birleşiyor
+  - Aşama 3 (5-10s): N-O-X-I-S harfleri tek tek impact efektiyle beliriyor
+    - Her harfin altında anlık olarak beliren İngilizce kelimeler (New, Ocular, eXperience, Is, Starting)
+  - Aşama 4 (10-12s): Final logo gösterimi parlak hale efekti ile
+- Leylak/mor renk teması (Lilac, Violet, Purple)
+- Framer Motion ile akıcı animasyonlar
+- Atla butonu ile intro'yu geçebilme
+- sessionStorage ile intro sadece ilk ziyarette gösterilir
+- Yeni bileşen: src/components/IntroAnimation.jsx
+- Yeni CSS animasyonları: pulse-glow, float-up, shimmer
+
+## Önceki Değişiklikler (28 Kasım 2025)
 
 ### NOXIS Rebrand ve MultiEmbed Kaynağı
 - Tüm StreamHub referansları NOXIS olarak güncellendi
