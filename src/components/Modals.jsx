@@ -333,28 +333,13 @@ export const DetailModal = ({ movie, onClose, onPlay, onOpenDetail, apiKey }) =>
 };
 
 export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
-    const [source, setSource] = useState('multiembed');
+    const [source, setSource] = useState('hdfilmizle');
     const [showControls, setShowControls] = useState(true);
-    const [noxisUrl, setNoxisUrl] = useState(null);
     const [scrapedUrls, setScrapedUrls] = useState({});
     const [loadingSource, setLoadingSource] = useState(null);
     const [iframeError, setIframeError] = useState(false);
     const controlsTimeout = useRef(null);
     const isSeries = movie.media_type === 'tv' || movie.first_air_date;
-    
-    useEffect(() => {
-        if (!isSeries) {
-            const slug = createSlug(movie.title || movie.name);
-            fetch(`/.netlify/functions/stream?slug=${slug}`)
-                .then(res => {
-                    if (res.ok) {
-                        setNoxisUrl(`/.netlify/functions/stream?slug=${slug}`);
-                        setSource('noxis');
-                    }
-                })
-                .catch(() => {});
-        }
-    }, [movie, isSeries]);
 
     const scrapeIframeUrl = useCallback(async (site) => {
         if (scrapedUrls[site]) return scrapedUrls[site];
@@ -399,8 +384,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     }, [source, scrapeIframeUrl, scrapedUrls]);
 
     const SOURCES = [
-        ...(noxisUrl ? [{ id: 'noxis', name: '⚡ NOXIS HQ' }] : []),
-        { id: 'hdfilmizle', name: '🎥 HDFilmizle' },
+        { id: 'hdfilmizle', name: '🇹🇷 Türkçe' },
         { id: 'multiembed', name: 'MultiEmbed' },
         { id: 'vidsrc.cc', name: 'VidSrc CC' }, 
         { id: 'vsrc.su', name: 'VSrc SU' }, 
@@ -409,10 +393,6 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     ];
     
     const getUrl = useCallback(() => {
-        if (source === 'noxis' && noxisUrl) {
-            return noxisUrl;
-        }
-
         if (source === 'hdfilmizle' && scrapedUrls.hdfilmizle) {
             return `/api/video-proxy?url=${encodeURIComponent(scrapedUrls.hdfilmizle)}`;
         }
@@ -433,7 +413,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
         return isSeries 
             ? `https://${source}/embed/tv/${movie.id}/${initialSeason}/${initialEpisode}` 
             : `https://${source}/embed/movie/${movie.id}`;
-    }, [source, isSeries, movie.id, initialSeason, initialEpisode, noxisUrl, scrapedUrls]);
+    }, [source, isSeries, movie.id, initialSeason, initialEpisode, scrapedUrls]);
 
     const getDirectUrl = useCallback(() => {
         if (source === 'hdfilmizle' && scrapedUrls.hdfilmizle) {
@@ -511,12 +491,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
                                 tabIndex="0" 
                                 onClick={() => setSource(s.id)} 
                                 className={`focusable source-btn ${source === s.id ? 'active' : ''}`}
-                                style={s.id === 'noxis' ? { 
-                                    background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)', 
-                                    color: '#000', 
-                                    fontWeight: '800',
-                                    boxShadow: '0 0 15px rgba(255, 215, 0, 0.3)'
-                                } : s.id === 'hdfilmizle' ? {
+                                style={s.id === 'hdfilmizle' ? {
                                     background: 'linear-gradient(135deg, #e91e63 0%, #9c27b0 100%)', 
                                     color: '#fff', 
                                     fontWeight: '700',
@@ -549,7 +524,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
                         margin: '0 auto 16px'
                     }}></div>
                     <p style={{ fontSize: '16px', opacity: 0.8 }}>
-                        {loadingSource === 'hdfilmizle' ? 'HDFilmizle' : 'Selcukflix'} kaynağı aranıyor...
+                        Türkçe kaynak aranıyor...
                     </p>
                 </div>
             ) : getUrl() ? (
