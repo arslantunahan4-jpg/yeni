@@ -4,6 +4,7 @@ import { useTVNavigation, useGamepadNavigation, useSmartMouse, fetchTMDB, getSto
 import { NavBar, MobileNav, SmartImage, POSTER_IMG } from './components/Shared';
 import { HeroCarousel, Row } from './components/HomeWidgets';
 import { DetailModal, Player } from './components/Modals';
+import IntroAnimation from './components/IntroAnimation';
 import './index.css';
 
 const GENRE_TRANSLATIONS = {
@@ -49,11 +50,20 @@ const SORT_OPTIONS = [
 ];
 
 const App = () => {
+    const [showIntro, setShowIntro] = useState(() => {
+        const hasSeenIntro = sessionStorage.getItem('noxis_intro_seen');
+        return !hasSeenIntro;
+    });
     const [apiKey, setApiKey] = useState(localStorage.getItem('tmdb_api_key_v3'));
     const [activeTab, setActiveTab] = useState('Ana Sayfa');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [error, setError] = useState(null);
+
+    const handleIntroComplete = useCallback(() => {
+        sessionStorage.setItem('noxis_intro_seen', 'true');
+        setShowIntro(false);
+    }, []);
     
     const [showFilters, setShowFilters] = useState(false);
     const [filters, setFilters] = useState({
@@ -336,7 +346,9 @@ const App = () => {
 
     if (!apiKey) {
         return (
-            <div className="api-key-container">
+            <>
+                {showIntro && <IntroAnimation onComplete={handleIntroComplete} />}
+                <div className="api-key-container">
                 <img src="/noxis-logo.svg" alt="Noxis" className="api-key-logo" style={{ width: '280px', height: 'auto', marginBottom: '24px' }} />
                 <h1 className="api-key-title" style={{ display: 'none' }}>Noxis</h1>
                 <input 
@@ -389,10 +401,13 @@ const App = () => {
                     TMDB API anahtarınızı <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer" style={{ color: '#0a84ff' }}>themoviedb.org</a> adresinden alabilirsiniz.
                 </p>
             </div>
+            </>
         );
     }
 
     return (
+        <>
+        {showIntro && <IntroAnimation onComplete={handleIntroComplete} />}
         <div style={{
             background: 'var(--bg-primary)',
             minHeight: '100dvh',
@@ -741,6 +756,7 @@ const App = () => {
                 />
             )}
         </div>
+        </>
     );
 };
 
