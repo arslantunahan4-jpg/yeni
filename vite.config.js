@@ -222,14 +222,35 @@ function scraperPlugin() {
             let moviePageUrl = null;
 
             if (site === 'hdfilmizle') {
-              const urlVariations = [
-                `https://www.hdfilmizle.life/${slug}-izle-hd/`,
-                `https://www.hdfilmizle.life/${slug}-izle/`,
-                `https://www.hdfilmizle.life/${slug}-hd-izle/`,
-                `https://www.hdfilmizle.life/${slug}-full-izle/`,
-                `https://www.hdfilmizle.life/${slug}-turkce-dublaj-izle/`,
-                `https://www.hdfilmizle.life/${slug}/`
-              ];
+              let urlVariations = [];
+              
+              const isTvSeries = season && episode;
+              
+              if (isTvSeries) {
+                console.log(`[HDFilmizle] Searching for TV series: ${slug} S${season}E${episode}`);
+                urlVariations = [
+                  `https://www.hdfilmizle.life/dizi/${slug}/sezon-${season}/bolum-${episode}/`,
+                  `https://www.hdfilmizle.life/dizi/${slug}/sezon-${season}/bolum-${episode}`,
+                  `https://www.hdfilmizle.life/dizi/${slug}-izle/sezon-${season}/bolum-${episode}/`,
+                  `https://www.hdfilmizle.life/dizi/${slug}/s${season}/e${episode}/`,
+                  `https://www.hdfilmizle.life/${slug}/sezon-${season}/bolum-${episode}/`,
+                  `https://www.hdfilmizle.life/${slug}-sezon-${season}-bolum-${episode}/`,
+                  `https://www.hdfilmizle.life/${slug}-${season}-sezon-${episode}-bolum-izle/`,
+                  `https://www.hdfilmizle.life/dizi/${slug}/`
+                ];
+              } else {
+                console.log(`[HDFilmizle] Searching for movie: ${slug}`);
+                urlVariations = [
+                  `https://www.hdfilmizle.life/${slug}-izle-hd/`,
+                  `https://www.hdfilmizle.life/${slug}-izle/`,
+                  `https://www.hdfilmizle.life/${slug}-hd-izle/`,
+                  `https://www.hdfilmizle.life/${slug}-full-izle/`,
+                  `https://www.hdfilmizle.life/${slug}-turkce-dublaj-izle/`,
+                  `https://www.hdfilmizle.life/${slug}/`,
+                  `https://www.hdfilmizle.life/film/${slug}/`,
+                  `https://www.hdfilmizle.life/film/${slug}-izle/`
+                ];
+              }
               
               for (const tryUrl of urlVariations) {
                 try {
@@ -240,38 +261,76 @@ function scraperPlugin() {
                     validateStatus: (status) => status < 500
                   });
                   
-                  if (response.status === 200 && response.data.includes('iframe')) {
-                    moviePageUrl = tryUrl;
+                  if (response.status === 200) {
                     const html = response.data;
                     
-                    const partsMatch = html.match(/let\s+parts\s*=\s*(\[[\s\S]*?\]);/);
-                    if (partsMatch) {
-                      try {
-                        const partsJson = partsMatch[1]
-                          .replace(/\\"/g, '"')
-                          .replace(/\\\//g, '/');
-                        const srcMatch = partsJson.match(/src=\\"([^"\\]+)\\"/);
-                        if (srcMatch) {
-                          iframeSrc = srcMatch[1] + '?ap=1';
-                          console.log(`[HDFilmizle] Found in parts: ${iframeSrc}`);
+                    if (html.includes('iframe') || html.includes('player') || html.includes('video')) {
+                      moviePageUrl = tryUrl;
+                      console.log(`[HDFilmizle] Found page: ${tryUrl}`);
+                      
+                      const partsMatch = html.match(/let\s+parts\s*=\s*(\[[\s\S]*?\]);/);
+                      if (partsMatch) {
+                        try {
+                          const partsJson = partsMatch[1]
+                            .replace(/\\"/g, '"')
+                            .replace(/\\\//g, '/');
+                          const srcMatch = partsJson.match(/src=\\"([^"\\]+)\\"/);
+                          if (srcMatch) {
+                            iframeSrc = srcMatch[1];
+                            if (!iframeSrc.includes('?')) iframeSrc += '?ap=1';
+                            else if (!iframeSrc.includes('ap=')) iframeSrc += '&ap=1';
+                            console.log(`[HDFilmizle] Found in parts: ${iframeSrc}`);
+                            break;
+                          }
+                        } catch (e) {
+                          console.log(`[HDFilmizle] Parts parse error:`, e.message);
+                        }
+                      }
+                      
+                      const iframeMatch = html.match(/iframe[^>]*src=["']([^"']+)["']/i);
+                      if (iframeMatch) {
+                        let src = iframeMatch[1];
+                        if (src.startsWith('//')) src = 'https:' + src;
+                        if (src.includes('vidframe') || src.includes('vidrame') || src.includes('rapid') || src.includes('player') || src.includes('embed')) {
+                          iframeSrc = src;
+                          if (!iframeSrc.includes('?')) iframeSrc += '?ap=1';
+                          else if (!iframeSrc.includes('ap=')) iframeSrc += '&ap=1';
+                          console.log(`[HDFilmizle] Found iframe via regex: ${iframeSrc}`);
                           break;
                         }
-                      } catch (e) {
-                        console.log(`[HDFilmizle] Parts parse error:`, e.message);
                       }
+                      
+                      const $ = cheerio.load(html);
+                      $('iframe').each((i, el) => {
+                        if (iframeSrc) return;
+                        const src = $(el).attr('data-src') || $(el).attr('src');
+                        if (src && (src.includes('vidframe') || src.includes('vidrame') || src.includes('rapid') || src.includes('player') || src.includes('embed'))) {
+                          iframeSrc = src.startsWith('//') ? 'https:' + src : src;
+                          if (!iframeSrc.includes('?')) iframeSrc += '?ap=1';
+                          else if (!iframeSrc.includes('ap=')) iframeSrc += '&ap=1';
+                          console.log(`[HDFilmizle] Found iframe via cheerio: ${iframeSrc}`);
+                        }
+                      });
+                      
+                      if (!iframeSrc) {
+                        const dataPlayerMatch = html.match(/data-player=["']([^"']+)["']/i);
+                        const embedMatch = html.match(/embed[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
+                        const playerMatch = html.match(/player[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
+                        const videoSrcMatch = html.match(/video[Ss]rc\s*[:=]\s*["']([^"']+)["']/);
+                        
+                        const foundMatch = dataPlayerMatch || embedMatch || playerMatch || videoSrcMatch;
+                        if (foundMatch) {
+                          let src = foundMatch[1];
+                          if (src.startsWith('//')) src = 'https:' + src;
+                          iframeSrc = src;
+                          if (!iframeSrc.includes('?')) iframeSrc += '?ap=1';
+                          else if (!iframeSrc.includes('ap=')) iframeSrc += '&ap=1';
+                          console.log(`[HDFilmizle] Found via data attributes: ${iframeSrc}`);
+                        }
+                      }
+                      
+                      if (iframeSrc) break;
                     }
-                    
-                    const $ = cheerio.load(html);
-                    $('iframe').each((i, el) => {
-                      const src = $(el).attr('data-src') || $(el).attr('src');
-                      if (src && (src.includes('vidframe') || src.includes('vidrame') || src.includes('rapid') || src.includes('player'))) {
-                        iframeSrc = src.startsWith('//') ? 'https:' + src : src;
-                        if (!iframeSrc.includes('?ap=')) iframeSrc += '?ap=1';
-                        console.log(`[HDFilmizle] Found iframe: ${iframeSrc}`);
-                      }
-                    });
-                    
-                    if (iframeSrc) break;
                   }
                 } catch (e) {
                   console.log(`[HDFilmizle] Error trying ${tryUrl}:`, e.message);
