@@ -199,6 +199,7 @@ function scraperPlugin() {
           const site = url.searchParams.get('site');
           const slug = url.searchParams.get('slug');
           const title = url.searchParams.get('title') || slug;
+          const originalTitle = url.searchParams.get('original') || title;
           const season = url.searchParams.get('s');
           const episode = url.searchParams.get('e');
 
@@ -224,10 +225,15 @@ function scraperPlugin() {
             if (site === 'hdfilmizle') {
               const isTvSeries = season && episode;
               
-              console.log(`[HDFilmizle] Searching for: "${title}" (slug: ${slug})`);
+              console.log(`[HDFilmizle] Searching for: "${title}" / "${originalTitle}" (slug: ${slug})`);
               
-              const searchAndFindContent = async () => {
-                const searchUrl = `https://www.hdfilmizle.life/?s=${encodeURIComponent(title)}`;
+              const normalizeTitle = (t) => t.toLowerCase()
+                .replace(/[çÇ]/g, 'c').replace(/[ğĞ]/g, 'g').replace(/[şŞ]/g, 's')
+                .replace(/[üÜ]/g, 'u').replace(/[ıİ]/g, 'i').replace(/[öÖ]/g, 'o')
+                .replace(/[^a-z0-9]/g, '');
+              
+              const searchWithQuery = async (query) => {
+                const searchUrl = `https://www.hdfilmizle.life/?s=${encodeURIComponent(query)}`;
                 console.log(`[HDFilmizle] Searching: ${searchUrl}`);
                 
                 try {
@@ -254,49 +260,82 @@ function scraperPlugin() {
                       }
                     });
                     
-                    console.log(`[HDFilmizle] Found ${results.length} search results`);
-                    
-                    if (results.length > 0) {
-                      const normalizeTitle = (t) => t.toLowerCase()
-                        .replace(/[çÇ]/g, 'c').replace(/[ğĞ]/g, 'g').replace(/[şŞ]/g, 's')
-                        .replace(/[üÜ]/g, 'u').replace(/[ıİ]/g, 'i').replace(/[öÖ]/g, 'o')
-                        .replace(/[^a-z0-9]/g, '');
-                      
-                      const normalizedSearch = normalizeTitle(title);
-                      
-                      let bestMatch = results[0];
-                      let bestScore = 0;
-                      
-                      for (const result of results) {
-                        const normalizedResult = normalizeTitle(result.title);
-                        
-                        if (normalizedResult === normalizedSearch) {
-                          bestMatch = result;
-                          bestScore = 100;
-                          break;
-                        }
-                        
-                        if (normalizedResult.includes(normalizedSearch) || normalizedSearch.includes(normalizedResult)) {
-                          const score = Math.min(normalizedResult.length, normalizedSearch.length) / 
-                                       Math.max(normalizedResult.length, normalizedSearch.length) * 100;
-                          if (score > bestScore) {
-                            bestScore = score;
-                            bestMatch = result;
-                          }
-                        }
-                      }
-                      
-                      console.log(`[HDFilmizle] Best match: "${bestMatch.title}" (score: ${bestScore.toFixed(1)}%) -> ${bestMatch.link}`);
-                      return bestMatch.link;
-                    }
+                    return results;
                   }
                 } catch (e) {
-                  console.log(`[HDFilmizle] Search error:`, e.message);
+                  console.log(`[HDFilmizle] Search error for "${query}":`, e.message);
                 }
-                return null;
+                return [];
               };
               
-              let contentUrl = await searchAndFindContent();
+              const findBestMatch = (results, searchTerms) => {
+                if (results.length === 0) return null;
+                
+                let bestMatch = null;
+                let bestScore = 0;
+                
+                for (const searchTerm of searchTerms) {
+                  const normalizedSearch = normalizeTitle(searchTerm);
+                  
+                  for (const result of results) {
+                    const normalizedResult = normalizeTitle(result.title);
+                    
+                    if (normalizedResult === normalizedSearch) {
+                      return result.link;
+                    }
+                    
+                    let score = 0;
+                    if (normalizedResult.includes(normalizedSearch)) {
+                      score = (normalizedSearch.length / normalizedResult.length) * 100;
+                    } else if (normalizedSearch.includes(normalizedResult)) {
+                      score = (normalizedResult.length / normalizedSearch.length) * 80;
+                    }
+                    
+                    if (score > bestScore) {
+                      bestScore = score;
+                      bestMatch = result;
+                    }
+                  }
+                }
+                
+                if (bestMatch && bestScore > 30) {
+                  console.log(`[HDFilmizle] Best match: "${bestMatch.title}" (score: ${bestScore.toFixed(1)}%) -> ${bestMatch.link}`);
+                  return bestMatch.link;
+                }
+                
+                return results[0]?.link || null;
+              };
+              
+              let allResults = [];
+              const searchTerms = [title];
+              if (originalTitle && originalTitle !== title) {
+                searchTerms.push(originalTitle);
+              }
+              
+              for (const term of searchTerms) {
+                const results = await searchWithQuery(term);
+                console.log(`[HDFilmizle] Found ${results.length} results for "${term}"`);
+                allResults = [...allResults, ...results];
+                
+                if (results.length > 0) {
+                  const exactMatch = results.find(r => 
+                    normalizeTitle(r.title) === normalizeTitle(term)
+                  );
+                  if (exactMatch) {
+                    console.log(`[HDFilmizle] Exact match found: ${exactMatch.link}`);
+                    allResults = [exactMatch];
+                    break;
+                  }
+                }
+              }
+              
+              const uniqueResults = allResults.filter((r, i, arr) => 
+                arr.findIndex(x => x.link === r.link) === i
+              );
+              
+              console.log(`[HDFilmizle] Total unique results: ${uniqueResults.length}`);
+              
+              let contentUrl = findBestMatch(uniqueResults, searchTerms);
               
               if (!contentUrl) {
                 const urlVariations = isTvSeries ? [

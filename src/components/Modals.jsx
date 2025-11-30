@@ -346,8 +346,9 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
         
         setLoadingSource(site);
         const movieTitle = movie.title || movie.name;
+        const originalTitle = movie.original_title || movie.original_name || movieTitle;
         const slug = createSlug(movieTitle);
-        const params = new URLSearchParams({ site, slug, title: movieTitle });
+        const params = new URLSearchParams({ site, slug, title: movieTitle, original: originalTitle });
         if (isSeries) {
             params.append('s', initialSeason);
             params.append('e', initialEpisode);
