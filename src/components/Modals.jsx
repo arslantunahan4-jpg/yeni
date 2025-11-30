@@ -365,6 +365,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     const SOURCES = [
         // YENİ: Eğer noxisUrl varsa listeye "NOXIS HQ" seçeneğini ekle
         ...(noxisUrl ? [{ id: 'noxis', name: '⚡ NOXIS HQ' }] : []),
+        { id: 'selcukflix', name: '🎬 Selcukflix' },
         { id: 'multiembed', name: 'MultiEmbed' },
         { id: 'vidsrc.cc', name: 'VidSrc CC' }, 
         { id: 'vsrc.su', name: 'VSrc SU' }, 
@@ -376,6 +377,18 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
         // YENİ: Kaynak Noxis ise bizim proxy url'yi döndür
         if (source === 'noxis' && noxisUrl) {
             return noxisUrl;
+        }
+
+        // Selcukflix kaynağı - film adından slug oluştur
+        if (source === 'selcukflix') {
+            const slug = createSlug(movie.title || movie.name);
+            if (isSeries) {
+                // Diziler için: https://selcukflix.net/dizi/{slug}/{sezon}-sezon-{bolum}-bolum
+                return `https://selcukflix.net/dizi/${slug}/${initialSeason}-sezon-${initialEpisode}-bolum`;
+            } else {
+                // Filmler için: https://selcukflix.net/film/{slug}/izle
+                return `https://selcukflix.net/film/${slug}/izle`;
+            }
         }
 
         if (source === 'multiembed') {
@@ -454,12 +467,16 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
                                 tabIndex="0" 
                                 onClick={() => setSource(s.id)} 
                                 className={`focusable source-btn ${source === s.id ? 'active' : ''}`}
-                                // Noxis seçeneği varsa onu altın rengi yapıp öne çıkarıyoruz
                                 style={s.id === 'noxis' ? { 
                                     background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)', 
                                     color: '#000', 
                                     fontWeight: '800',
                                     boxShadow: '0 0 15px rgba(255, 215, 0, 0.3)'
+                                } : s.id === 'selcukflix' ? {
+                                    background: 'linear-gradient(135deg, #ff3130 0%, #b91d1c 100%)', 
+                                    color: '#fff', 
+                                    fontWeight: '700',
+                                    boxShadow: '0 0 15px rgba(255, 49, 48, 0.4)'
                                 } : {}}
                             >
                                 {s.name}
