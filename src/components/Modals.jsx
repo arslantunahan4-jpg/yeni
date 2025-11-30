@@ -366,6 +366,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
         // YENİ: Eğer noxisUrl varsa listeye "NOXIS HQ" seçeneğini ekle
         ...(noxisUrl ? [{ id: 'noxis', name: '⚡ NOXIS HQ' }] : []),
         { id: 'selcukflix', name: '🎬 Selcukflix' },
+        { id: 'hdfilmizle', name: '🎥 HDFilmizle' },
         { id: 'multiembed', name: 'MultiEmbed' },
         { id: 'vidsrc.cc', name: 'VidSrc CC' }, 
         { id: 'vsrc.su', name: 'VSrc SU' }, 
@@ -388,6 +389,18 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
             } else {
                 // Filmler için: https://selcukflix.net/film/{slug}/izle
                 return `https://selcukflix.net/film/${slug}/izle`;
+            }
+        }
+
+        // HDFilmizle kaynağı - film adından slug oluştur
+        if (source === 'hdfilmizle') {
+            const slug = createSlug(movie.title || movie.name);
+            if (isSeries) {
+                // Diziler için: https://www.hdfilmizle.life/{slug}-{sezon}-sezon-{bolum}-bolum-izle/
+                return `https://www.hdfilmizle.life/${slug}-${initialSeason}-sezon-${initialEpisode}-bolum-izle/`;
+            } else {
+                // Filmler için: https://www.hdfilmizle.life/{slug}-izle-hd/
+                return `https://www.hdfilmizle.life/${slug}-izle-hd/`;
             }
         }
 
@@ -477,6 +490,11 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
                                     color: '#fff', 
                                     fontWeight: '700',
                                     boxShadow: '0 0 15px rgba(255, 49, 48, 0.4)'
+                                } : s.id === 'hdfilmizle' ? {
+                                    background: 'linear-gradient(135deg, #e91e63 0%, #9c27b0 100%)', 
+                                    color: '#fff', 
+                                    fontWeight: '700',
+                                    boxShadow: '0 0 15px rgba(233, 30, 99, 0.4)'
                                 } : {}}
                             >
                                 {s.name}
