@@ -359,15 +359,16 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
         if (scrapedUrls[site]) return scrapedUrls[site];
         
         setLoadingSource(site);
-        const slug = createSlug(movie.title || movie.name);
-        const params = new URLSearchParams({ site, slug });
+        const movieTitle = movie.title || movie.name;
+        const slug = createSlug(movieTitle);
+        const params = new URLSearchParams({ site, slug, title: movieTitle });
         if (isSeries) {
             params.append('s', initialSeason);
             params.append('e', initialEpisode);
         }
         
         try {
-            console.log(`[Player] Scraping ${site} for: ${slug}`);
+            console.log(`[Player] Scraping ${site} for: ${movieTitle} (${slug})`);
             const res = await fetch(`/api/scrape-iframe?${params}`);
             const data = await res.json();
             
@@ -377,9 +378,9 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
                 setLoadingSource(null);
                 return data.url;
             } else {
-                console.log(`[Player] ❌ No iframe found, using fallback`);
+                console.log(`[Player] ❌ No iframe found for ${site}`, data);
                 setLoadingSource(null);
-                return data.fallbackUrl || null;
+                return null;
             }
         } catch (err) {
             console.error(`[Player] Scrape error:`, err);
@@ -389,7 +390,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     }, [movie, isSeries, initialSeason, initialEpisode, scrapedUrls]);
 
     useEffect(() => {
-        if (source === 'hdfilmizle' || source === 'selcukflix') {
+        if (source === 'hdfilmizle') {
             if (!scrapedUrls[source]) {
                 scrapeIframeUrl(source);
             }
@@ -399,7 +400,6 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     const SOURCES = [
         ...(noxisUrl ? [{ id: 'noxis', name: '⚡ NOXIS HQ' }] : []),
         { id: 'hdfilmizle', name: '🎥 HDFilmizle' },
-        { id: 'selcukflix', name: '🎬 Selcukflix' },
         { id: 'multiembed', name: 'MultiEmbed' },
         { id: 'vidsrc.cc', name: 'VidSrc CC' }, 
         { id: 'vsrc.su', name: 'VSrc SU' }, 
@@ -414,10 +414,6 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
 
         if (source === 'hdfilmizle' && scrapedUrls.hdfilmizle) {
             return scrapedUrls.hdfilmizle;
-        }
-
-        if (source === 'selcukflix' && scrapedUrls.selcukflix) {
-            return scrapedUrls.selcukflix;
         }
 
         if (source === 'multiembed') {
@@ -501,11 +497,6 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
                                     color: '#000', 
                                     fontWeight: '800',
                                     boxShadow: '0 0 15px rgba(255, 215, 0, 0.3)'
-                                } : s.id === 'selcukflix' ? {
-                                    background: 'linear-gradient(135deg, #ff3130 0%, #b91d1c 100%)', 
-                                    color: '#fff', 
-                                    fontWeight: '700',
-                                    boxShadow: '0 0 15px rgba(255, 49, 48, 0.4)'
                                 } : s.id === 'hdfilmizle' ? {
                                     background: 'linear-gradient(135deg, #e91e63 0%, #9c27b0 100%)', 
                                     color: '#fff', 
