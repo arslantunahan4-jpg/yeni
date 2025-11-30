@@ -8,54 +8,188 @@ function scraperPlugin() {
     name: 'scraper-api',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
+        
         if (req.url.startsWith('/api/video-proxy')) {
           const url = new URL(req.url, 'http://localhost');
           const targetUrl = url.searchParams.get('url');
           
           if (!targetUrl) {
             res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ error: 'URL gerekli' }));
             return;
           }
 
           try {
             const parsedUrl = new URL(targetUrl);
-            const referer = `${parsedUrl.protocol}//${parsedUrl.host}/`;
+            const targetHost = parsedUrl.host;
             
+            const hdfilmizleReferer = 'https://www.hdfilmizle.life/';
+            const hdfilmizleOrigin = 'https://www.hdfilmizle.life';
+            
+            const proxyHeaders = {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+              'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+              'Accept-Encoding': 'gzip, deflate, br',
+              'Connection': 'keep-alive',
+              'Upgrade-Insecure-Requests': '1',
+              'Sec-Fetch-Dest': 'iframe',
+              'Sec-Fetch-Mode': 'navigate',
+              'Sec-Fetch-Site': 'cross-site',
+              'Sec-Fetch-User': '?1',
+              'Sec-CH-UA': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+              'Sec-CH-UA-Mobile': '?0',
+              'Sec-CH-UA-Platform': '"Windows"',
+              'Referer': hdfilmizleReferer,
+              'Origin': hdfilmizleOrigin,
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            };
+
+            console.log(`[VideoProxy] Fetching: ${targetUrl}`);
+            console.log(`[VideoProxy] Using Referer: ${hdfilmizleReferer}`);
+
             const response = await axios.get(targetUrl, {
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Referer': referer,
-                'Origin': referer.slice(0, -1),
-                'Sec-Fetch-Dest': 'iframe',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'cross-site'
-              },
-              timeout: 15000,
-              responseType: 'text'
+              headers: proxyHeaders,
+              timeout: 30000,
+              responseType: 'arraybuffer',
+              maxRedirects: 5,
+              validateStatus: () => true
             });
 
-            let html = response.data;
-            
-            const baseTag = `<base href="${referer}">`;
-            html = html.replace(/<head>/i, `<head>${baseTag}`);
-            
-            html = html.replace(/src=["']\/\//g, 'src="https://');
-            html = html.replace(/href=["']\/\//g, 'href="https://');
-            html = html.replace(/src=["']\//g, `src="${referer}`);
-            html = html.replace(/href=["']\//g, `href="${referer}`);
+            const contentType = response.headers['content-type'] || 'text/html';
+            console.log(`[VideoProxy] Response Content-Type: ${contentType}`);
 
-            res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.setHeader('Access-Control-Allow-Origin', '*');
-            res.setHeader('X-Frame-Options', 'ALLOWALL');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', '*');
+            res.removeHeader('X-Frame-Options');
             res.removeHeader('Content-Security-Policy');
-            res.end(html);
+            
+            if (contentType.includes('text/html')) {
+              let html = response.data.toString('utf-8');
+              
+              const baseUrl = `${parsedUrl.protocol}//${parsedUrl.host}`;
+              
+              if (!html.includes('<base')) {
+                html = html.replace(/<head([^>]*)>/i, `<head$1><base href="${baseUrl}/">`);
+              }
+              
+              html = html.replace(/document\.referrer/g, `"${hdfilmizleReferer}"`);
+              html = html.replace(/window\.location\.ancestorOrigins/g, `["${hdfilmizleOrigin}"]`);
+              html = html.replace(/parent\.location/g, `{href:"${hdfilmizleReferer}",origin:"${hdfilmizleOrigin}"}`);
+              html = html.replace(/top\.location/g, `{href:"${hdfilmizleReferer}",origin:"${hdfilmizleOrigin}"}`);
+              
+              html = html.replace(
+                /<head([^>]*)>/i,
+                `<head$1>
+                <script>
+                  Object.defineProperty(document, 'referrer', {
+                    get: function() { return '${hdfilmizleReferer}'; }
+                  });
+                  Object.defineProperty(document, 'domain', {
+                    get: function() { return 'hdfilmizle.life'; },
+                    set: function() {}
+                  });
+                  window.__originalFetch = window.fetch;
+                  window.fetch = function(url, options) {
+                    options = options || {};
+                    options.headers = options.headers || {};
+                    if (typeof url === 'string' && !url.startsWith('data:')) {
+                      options.headers['X-Requested-With'] = 'XMLHttpRequest';
+                    }
+                    return window.__originalFetch(url, options);
+                  };
+                </script>`
+              );
+              
+              html = html.replace(/src=["']\/\//g, 'src="https://');
+              html = html.replace(/href=["']\/\//g, 'href="https://');
+              
+              html = html.replace(/src=["'](?!https?:\/\/|data:|\/api)\/([^"']+)["']/g, `src="${baseUrl}/$1"`);
+              html = html.replace(/href=["'](?!https?:\/\/|data:|#|javascript:)\/([^"']+)["']/g, `href="${baseUrl}/$1"`);
+              
+              res.setHeader('Content-Type', 'text/html; charset=utf-8');
+              res.end(html);
+            } else {
+              res.setHeader('Content-Type', contentType);
+              if (response.headers['content-length']) {
+                res.setHeader('Content-Length', response.headers['content-length']);
+              }
+              res.end(response.data);
+            }
+            
+            console.log(`[VideoProxy] Successfully proxied: ${targetUrl}`);
           } catch (error) {
             console.error('[VideoProxy] Error:', error.message);
             res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ error: error.message }));
+          }
+          return;
+        }
+
+        if (req.url.startsWith('/api/stream-proxy/')) {
+          const urlPath = req.url.replace('/api/stream-proxy/', '');
+          const targetUrl = decodeURIComponent(urlPath.split('?')[0]);
+          
+          if (!targetUrl.startsWith('http')) {
+            res.statusCode = 400;
+            res.end('Invalid URL');
+            return;
+          }
+
+          try {
+            const parsedUrl = new URL(targetUrl);
+            
+            const proxyHeaders = {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+              'Accept': '*/*',
+              'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+              'Referer': 'https://www.hdfilmizle.life/',
+              'Origin': 'https://www.hdfilmizle.life',
+              'Sec-Fetch-Dest': 'video',
+              'Sec-Fetch-Mode': 'cors',
+              'Sec-Fetch-Site': 'cross-site'
+            };
+
+            if (req.headers.range) {
+              proxyHeaders['Range'] = req.headers.range;
+            }
+
+            const response = await axios.get(targetUrl, {
+              headers: proxyHeaders,
+              responseType: 'stream',
+              timeout: 60000,
+              maxRedirects: 5,
+              validateStatus: () => true
+            });
+
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Range');
+            res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range');
+            
+            if (response.headers['content-type']) {
+              res.setHeader('Content-Type', response.headers['content-type']);
+            }
+            if (response.headers['content-length']) {
+              res.setHeader('Content-Length', response.headers['content-length']);
+            }
+            if (response.headers['content-range']) {
+              res.setHeader('Content-Range', response.headers['content-range']);
+            }
+            if (response.headers['accept-ranges']) {
+              res.setHeader('Accept-Ranges', response.headers['accept-ranges']);
+            }
+            
+            res.statusCode = response.status;
+            response.data.pipe(res);
+          } catch (error) {
+            console.error('[StreamProxy] Error:', error.message);
+            res.statusCode = 500;
+            res.end('Proxy error: ' + error.message);
           }
           return;
         }
