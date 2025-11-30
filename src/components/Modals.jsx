@@ -338,6 +338,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     const [noxisUrl, setNoxisUrl] = useState(null);
     const [scrapedUrls, setScrapedUrls] = useState({});
     const [loadingSource, setLoadingSource] = useState(null);
+    const [iframeError, setIframeError] = useState(false);
     const controlsTimeout = useRef(null);
     const isSeries = movie.media_type === 'tv' || movie.first_air_date;
     
@@ -413,7 +414,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
         }
 
         if (source === 'hdfilmizle' && scrapedUrls.hdfilmizle) {
-            return scrapedUrls.hdfilmizle;
+            return `/api/video-proxy?url=${encodeURIComponent(scrapedUrls.hdfilmizle)}`;
         }
 
         if (source === 'multiembed') {
@@ -433,6 +434,24 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
             ? `https://${source}/embed/tv/${movie.id}/${initialSeason}/${initialEpisode}` 
             : `https://${source}/embed/movie/${movie.id}`;
     }, [source, isSeries, movie.id, initialSeason, initialEpisode, noxisUrl, scrapedUrls]);
+
+    const getDirectUrl = useCallback(() => {
+        if (source === 'hdfilmizle' && scrapedUrls.hdfilmizle) {
+            return scrapedUrls.hdfilmizle;
+        }
+        return null;
+    }, [source, scrapedUrls]);
+
+    const openInNewWindow = useCallback(() => {
+        const directUrl = getDirectUrl();
+        if (directUrl) {
+            window.open(directUrl, '_blank', 'width=1280,height=720,menubar=no,toolbar=no,location=no,status=no');
+        }
+    }, [getDirectUrl]);
+
+    useEffect(() => {
+        setIframeError(false);
+    }, [source, scrapedUrls]);
     
     const handleActivity = useCallback(() => { 
         setShowControls(true); 
@@ -534,16 +553,62 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
                     </p>
                 </div>
             ) : getUrl() ? (
-                <iframe 
-                    id="video-frame" 
-                    className="focusable" 
-                    key={source + (scrapedUrls[source] || '')} 
-                    src={getUrl()} 
-                    style={{ width: '100%', height: '100%', border: 'none' }} 
-                    allowFullScreen 
-                    allow="autoplay; encrypted-media" 
-                    title="Video Player"
-                />
+                <>
+                    <iframe 
+                        id="video-frame" 
+                        className="focusable" 
+                        key={source + (scrapedUrls[source] || '')} 
+                        src={getUrl()} 
+                        style={{ width: '100%', height: '100%', border: 'none' }} 
+                        allowFullScreen 
+                        allow="autoplay; encrypted-media" 
+                        title="Video Player"
+                        onError={() => setIframeError(true)}
+                    />
+                    {source === 'hdfilmizle' && getDirectUrl() && (
+                        <div style={{
+                            position: 'absolute',
+                            bottom: '100px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            zIndex: 1000,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '12px'
+                        }}>
+                            <p style={{ 
+                                fontSize: '14px', 
+                                color: 'rgba(255,255,255,0.7)',
+                                textAlign: 'center',
+                                textShadow: '0 2px 8px rgba(0,0,0,0.8)'
+                            }}>
+                                Video yüklenmiyor mu?
+                            </p>
+                            <button
+                                onClick={openInNewWindow}
+                                className="focusable"
+                                style={{
+                                    padding: '12px 24px',
+                                    background: 'linear-gradient(135deg, #e91e63 0%, #9c27b0 100%)',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    color: 'white',
+                                    fontSize: '14px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    boxShadow: '0 4px 20px rgba(233, 30, 99, 0.4)'
+                                }}
+                            >
+                                <i className="fas fa-external-link-alt"></i>
+                                Yeni Pencerede Aç
+                            </button>
+                        </div>
+                    )}
+                </>
             ) : (
                 <div style={{
                     position: 'absolute',
@@ -556,6 +621,30 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
                     <i className="fas fa-exclamation-triangle" style={{ fontSize: '48px', marginBottom: '16px', color: '#ff6b6b' }}></i>
                     <p style={{ fontSize: '16px', opacity: 0.8 }}>Bu kaynak için video bulunamadı</p>
                     <p style={{ fontSize: '14px', opacity: 0.5, marginTop: '8px' }}>Lütfen başka bir kaynak deneyin</p>
+                    {source === 'hdfilmizle' && getDirectUrl() && (
+                        <button
+                            onClick={openInNewWindow}
+                            className="focusable"
+                            style={{
+                                marginTop: '20px',
+                                padding: '12px 24px',
+                                background: 'linear-gradient(135deg, #e91e63 0%, #9c27b0 100%)',
+                                border: 'none',
+                                borderRadius: '12px',
+                                color: 'white',
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                boxShadow: '0 4px 20px rgba(233, 30, 99, 0.4)'
+                            }}
+                        >
+                            <i className="fas fa-external-link-alt"></i>
+                            Yeni Pencerede Aç
+                        </button>
+                    )}
                 </div>
             )}
         </div>

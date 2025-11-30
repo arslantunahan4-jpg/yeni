@@ -8,6 +8,58 @@ function scraperPlugin() {
     name: 'scraper-api',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
+        if (req.url.startsWith('/api/video-proxy')) {
+          const url = new URL(req.url, 'http://localhost');
+          const targetUrl = url.searchParams.get('url');
+          
+          if (!targetUrl) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'URL gerekli' }));
+            return;
+          }
+
+          try {
+            const parsedUrl = new URL(targetUrl);
+            const referer = `${parsedUrl.protocol}//${parsedUrl.host}/`;
+            
+            const response = await axios.get(targetUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Referer': referer,
+                'Origin': referer.slice(0, -1),
+                'Sec-Fetch-Dest': 'iframe',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'cross-site'
+              },
+              timeout: 15000,
+              responseType: 'text'
+            });
+
+            let html = response.data;
+            
+            const baseTag = `<base href="${referer}">`;
+            html = html.replace(/<head>/i, `<head>${baseTag}`);
+            
+            html = html.replace(/src=["']\/\//g, 'src="https://');
+            html = html.replace(/href=["']\/\//g, 'href="https://');
+            html = html.replace(/src=["']\//g, `src="${referer}`);
+            html = html.replace(/href=["']\//g, `href="${referer}`);
+
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('X-Frame-Options', 'ALLOWALL');
+            res.removeHeader('Content-Security-Policy');
+            res.end(html);
+          } catch (error) {
+            console.error('[VideoProxy] Error:', error.message);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: error.message }));
+          }
+          return;
+        }
+
         if (req.url.startsWith('/api/scrape-iframe')) {
           const url = new URL(req.url, 'http://localhost');
           const site = url.searchParams.get('site');
@@ -78,7 +130,7 @@ function scraperPlugin() {
                     const $ = cheerio.load(html);
                     $('iframe').each((i, el) => {
                       const src = $(el).attr('data-src') || $(el).attr('src');
-                      if (src && (src.includes('vidrame') || src.includes('rapid') || src.includes('player'))) {
+                      if (src && (src.includes('vidframe') || src.includes('vidrame') || src.includes('rapid') || src.includes('player'))) {
                         iframeSrc = src.startsWith('//') ? 'https:' + src : src;
                         if (!iframeSrc.includes('?ap=')) iframeSrc += '?ap=1';
                         console.log(`[HDFilmizle] Found iframe: ${iframeSrc}`);
