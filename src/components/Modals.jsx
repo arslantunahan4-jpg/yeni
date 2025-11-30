@@ -335,38 +335,71 @@ export const DetailModal = ({ movie, onClose, onPlay, onOpenDetail, apiKey }) =>
 export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     const [source, setSource] = useState('multiembed');
     const [showControls, setShowControls] = useState(true);
-    // YENİ: Bulunan kaliteli kaynağı saklamak için state
-    const [noxisUrl, setNoxisUrl] = useState(null); 
+    const [noxisUrl, setNoxisUrl] = useState(null);
+    const [scrapedUrls, setScrapedUrls] = useState({});
+    const [loadingSource, setLoadingSource] = useState(null);
     const controlsTimeout = useRef(null);
     const isSeries = movie.media_type === 'tv' || movie.first_air_date;
     
-    // YENİ: Player açılınca arka planda Netlify fonksiyonunu kontrol et
     useEffect(() => {
-        // Dizi değilse (şimdilik sadece filmler için botumuz var)
         if (!isSeries) {
             const slug = createSlug(movie.title || movie.name);
-            console.log("Noxis Kaynağı Aranıyor:", slug);
-
-            // Netlify Function'a istek at
             fetch(`/.netlify/functions/stream?slug=${slug}`)
                 .then(res => {
                     if (res.ok) {
-                        // Eğer başarılı dönerse (200 OK), bu URL'i kaydet
-                        const foundUrl = `/.netlify/functions/stream?slug=${slug}`;
-                        setNoxisUrl(foundUrl);
-                        setSource('noxis'); // Otomatik olarak en kaliteli kaynağa geç
-                        console.log("✅ Noxis Kaynağı Bulundu!");
+                        setNoxisUrl(`/.netlify/functions/stream?slug=${slug}`);
+                        setSource('noxis');
                     }
                 })
-                .catch(err => console.log("Otomatik kaynak bulunamadı:", err));
+                .catch(() => {});
         }
     }, [movie, isSeries]);
 
+    const scrapeIframeUrl = useCallback(async (site) => {
+        if (scrapedUrls[site]) return scrapedUrls[site];
+        
+        setLoadingSource(site);
+        const slug = createSlug(movie.title || movie.name);
+        const params = new URLSearchParams({ site, slug });
+        if (isSeries) {
+            params.append('s', initialSeason);
+            params.append('e', initialEpisode);
+        }
+        
+        try {
+            console.log(`[Player] Scraping ${site} for: ${slug}`);
+            const res = await fetch(`/api/scrape-iframe?${params}`);
+            const data = await res.json();
+            
+            if (data.success && data.url) {
+                console.log(`[Player] ✅ Found iframe: ${data.url}`);
+                setScrapedUrls(prev => ({ ...prev, [site]: data.url }));
+                setLoadingSource(null);
+                return data.url;
+            } else {
+                console.log(`[Player] ❌ No iframe found, using fallback`);
+                setLoadingSource(null);
+                return data.fallbackUrl || null;
+            }
+        } catch (err) {
+            console.error(`[Player] Scrape error:`, err);
+            setLoadingSource(null);
+            return null;
+        }
+    }, [movie, isSeries, initialSeason, initialEpisode, scrapedUrls]);
+
+    useEffect(() => {
+        if (source === 'hdfilmizle' || source === 'selcukflix') {
+            if (!scrapedUrls[source]) {
+                scrapeIframeUrl(source);
+            }
+        }
+    }, [source, scrapeIframeUrl, scrapedUrls]);
+
     const SOURCES = [
-        // YENİ: Eğer noxisUrl varsa listeye "NOXIS HQ" seçeneğini ekle
         ...(noxisUrl ? [{ id: 'noxis', name: '⚡ NOXIS HQ' }] : []),
-        { id: 'selcukflix', name: '🎬 Selcukflix' },
         { id: 'hdfilmizle', name: '🎥 HDFilmizle' },
+        { id: 'selcukflix', name: '🎬 Selcukflix' },
         { id: 'multiembed', name: 'MultiEmbed' },
         { id: 'vidsrc.cc', name: 'VidSrc CC' }, 
         { id: 'vsrc.su', name: 'VSrc SU' }, 
@@ -375,33 +408,16 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     ];
     
     const getUrl = useCallback(() => {
-        // YENİ: Kaynak Noxis ise bizim proxy url'yi döndür
         if (source === 'noxis' && noxisUrl) {
             return noxisUrl;
         }
 
-        // Selcukflix kaynağı - film adından slug oluştur
-        if (source === 'selcukflix') {
-            const slug = createSlug(movie.title || movie.name);
-            if (isSeries) {
-                // Diziler için: https://selcukflix.net/dizi/{slug}/{sezon}-sezon-{bolum}-bolum
-                return `https://selcukflix.net/dizi/${slug}/${initialSeason}-sezon-${initialEpisode}-bolum`;
-            } else {
-                // Filmler için: https://selcukflix.net/film/{slug}/izle
-                return `https://selcukflix.net/film/${slug}/izle`;
-            }
+        if (source === 'hdfilmizle' && scrapedUrls.hdfilmizle) {
+            return scrapedUrls.hdfilmizle;
         }
 
-        // HDFilmizle kaynağı - film adından slug oluştur
-        if (source === 'hdfilmizle') {
-            const slug = createSlug(movie.title || movie.name);
-            if (isSeries) {
-                // Diziler için: https://www.hdfilmizle.life/{slug}-{sezon}-sezon-{bolum}-bolum-izle/
-                return `https://www.hdfilmizle.life/${slug}-${initialSeason}-sezon-${initialEpisode}-bolum-izle/`;
-            } else {
-                // Filmler için: https://www.hdfilmizle.life/{slug}-izle-hd/
-                return `https://www.hdfilmizle.life/${slug}-izle-hd/`;
-            }
+        if (source === 'selcukflix' && scrapedUrls.selcukflix) {
+            return scrapedUrls.selcukflix;
         }
 
         if (source === 'multiembed') {
@@ -420,7 +436,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
         return isSeries 
             ? `https://${source}/embed/tv/${movie.id}/${initialSeason}/${initialEpisode}` 
             : `https://${source}/embed/movie/${movie.id}`;
-    }, [source, isSeries, movie.id, initialSeason, initialEpisode, noxisUrl]);
+    }, [source, isSeries, movie.id, initialSeason, initialEpisode, noxisUrl, scrapedUrls]);
     
     const handleActivity = useCallback(() => { 
         setShowControls(true); 
@@ -504,16 +520,53 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
                 </div>
             </div>
             
-            <iframe 
-                id="video-frame" 
-                className="focusable" 
-                key={source} 
-                src={getUrl()} 
-                style={{ width: '100%', height: '100%', border: 'none' }} 
-                allowFullScreen 
-                allow="autoplay; encrypted-media" 
-                title="Video Player"
-            />
+            {loadingSource ? (
+                <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    textAlign: 'center',
+                    color: 'white'
+                }}>
+                    <div style={{
+                        width: '50px',
+                        height: '50px',
+                        border: '3px solid rgba(255,255,255,0.2)',
+                        borderTop: '3px solid #e91e63',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite',
+                        margin: '0 auto 16px'
+                    }}></div>
+                    <p style={{ fontSize: '16px', opacity: 0.8 }}>
+                        {loadingSource === 'hdfilmizle' ? 'HDFilmizle' : 'Selcukflix'} kaynağı aranıyor...
+                    </p>
+                </div>
+            ) : getUrl() ? (
+                <iframe 
+                    id="video-frame" 
+                    className="focusable" 
+                    key={source + (scrapedUrls[source] || '')} 
+                    src={getUrl()} 
+                    style={{ width: '100%', height: '100%', border: 'none' }} 
+                    allowFullScreen 
+                    allow="autoplay; encrypted-media" 
+                    title="Video Player"
+                />
+            ) : (
+                <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    textAlign: 'center',
+                    color: 'white'
+                }}>
+                    <i className="fas fa-exclamation-triangle" style={{ fontSize: '48px', marginBottom: '16px', color: '#ff6b6b' }}></i>
+                    <p style={{ fontSize: '16px', opacity: 0.8 }}>Bu kaynak için video bulunamadı</p>
+                    <p style={{ fontSize: '14px', opacity: 0.5, marginTop: '8px' }}>Lütfen başka bir kaynak deneyin</p>
+                </div>
+            )}
         </div>
     );
 };
