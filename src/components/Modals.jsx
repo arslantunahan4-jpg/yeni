@@ -3,6 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SmartImage, ORIGINAL_IMG, BACKDROP_IMG, POSTER_IMG } from './Shared';
 import { fetchTMDB, isWatched, markAsWatched, saveContinueWatching } from '../hooks/useAppLogic';
 
+// --- YENİ EKLENEN: Slug Oluşturucu Yardımcı Fonksiyon ---
+// Film ismini botun anlayacağı URL formatına çevirir (Örn: "Hızlı ve Öfkeli" -> "hizli-ve-ofkeli")
+const createSlug = (text) => {
+    if (!text) return "";
+    const trMap = { 'ç': 'c', 'ğ': 'g', 'ş': 's', 'ü': 'u', 'ı': 'i', 'ö': 'o', 'Ç': 'c', 'Ğ': 'g', 'Ş': 's', 'Ü': 'u', 'İ': 'i', 'Ö': 'o' };
+    return text.split('').map(char => trMap[char] || char).join('')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '') // Harf rakam dışını sil
+        .replace(/\s+/g, '-')         // Boşlukları tire yap
+        .replace(/-+/g, '-');         // Çift tireleri düzelt
+};
+
 export const DetailModal = ({ movie, onClose, onPlay, onOpenDetail, apiKey }) => {
     const [details, setDetails] = useState(null);
     const [seasons, setSeasons] = useState([]);
@@ -323,10 +335,36 @@ export const DetailModal = ({ movie, onClose, onPlay, onOpenDetail, apiKey }) =>
 export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     const [source, setSource] = useState('multiembed');
     const [showControls, setShowControls] = useState(true);
+    // YENİ: Bulunan kaliteli kaynağı saklamak için state
+    const [noxisUrl, setNoxisUrl] = useState(null); 
     const controlsTimeout = useRef(null);
     const isSeries = movie.media_type === 'tv' || movie.first_air_date;
     
+    // YENİ: Player açılınca arka planda Netlify fonksiyonunu kontrol et
+    useEffect(() => {
+        // Dizi değilse (şimdilik sadece filmler için botumuz var)
+        if (!isSeries) {
+            const slug = createSlug(movie.title || movie.name);
+            console.log("Noxis Kaynağı Aranıyor:", slug);
+
+            // Netlify Function'a istek at
+            fetch(`/.netlify/functions/stream?slug=${slug}`)
+                .then(res => {
+                    if (res.ok) {
+                        // Eğer başarılı dönerse (200 OK), bu URL'i kaydet
+                        const foundUrl = `/.netlify/functions/stream?slug=${slug}`;
+                        setNoxisUrl(foundUrl);
+                        setSource('noxis'); // Otomatik olarak en kaliteli kaynağa geç
+                        console.log("✅ Noxis Kaynağı Bulundu!");
+                    }
+                })
+                .catch(err => console.log("Otomatik kaynak bulunamadı:", err));
+        }
+    }, [movie, isSeries]);
+
     const SOURCES = [
+        // YENİ: Eğer noxisUrl varsa listeye "NOXIS HQ" seçeneğini ekle
+        ...(noxisUrl ? [{ id: 'noxis', name: '⚡ NOXIS HQ' }] : []),
         { id: 'multiembed', name: 'MultiEmbed' },
         { id: 'vidsrc.cc', name: 'VidSrc CC' }, 
         { id: 'vsrc.su', name: 'VSrc SU' }, 
@@ -335,6 +373,11 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     ];
     
     const getUrl = useCallback(() => {
+        // YENİ: Kaynak Noxis ise bizim proxy url'yi döndür
+        if (source === 'noxis' && noxisUrl) {
+            return noxisUrl;
+        }
+
         if (source === 'multiembed') {
             return isSeries 
                 ? `https://multiembed.mov/directstream.php?video_id=${movie.id}&tmdb=1&s=${initialSeason}&e=${initialEpisode}` 
@@ -351,7 +394,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
         return isSeries 
             ? `https://${source}/embed/tv/${movie.id}/${initialSeason}/${initialEpisode}` 
             : `https://${source}/embed/movie/${movie.id}`;
-    }, [source, isSeries, movie.id, initialSeason, initialEpisode]);
+    }, [source, isSeries, movie.id, initialSeason, initialEpisode, noxisUrl]);
     
     const handleActivity = useCallback(() => { 
         setShowControls(true); 
@@ -411,6 +454,13 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
                                 tabIndex="0" 
                                 onClick={() => setSource(s.id)} 
                                 className={`focusable source-btn ${source === s.id ? 'active' : ''}`}
+                                // Noxis seçeneği varsa onu altın rengi yapıp öne çıkarıyoruz
+                                style={s.id === 'noxis' ? { 
+                                    background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)', 
+                                    color: '#000', 
+                                    fontWeight: '800',
+                                    boxShadow: '0 0 15px rgba(255, 215, 0, 0.3)'
+                                } : {}}
                             >
                                 {s.name}
                             </button>
