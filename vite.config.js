@@ -403,16 +403,19 @@ function scraperPlugin() {
                   const html = response.data;
                   moviePageUrl = contentUrl;
                   
-                  const vidrameDomains = ['vidrame', 'vidframe', 'rapid', 'vidmoly', 'closeload', 'fastload', 'hdplayer', 'videoseyred', 'supervideo', 'vidsrc', 'streamtape', 'mixdrop'];
+                  const vidrameDomains = ['vidrame.pro', 'vidframe', 'rapidvid', 'vidmoly', 'closeload', 'fastload', 'hdplayer', 'videoseyred', 'supervideo', 'vidsrc', 'streamtape', 'mixdrop'];
+                  const excludeExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.ico', '.css', '.js', '.woff', '.woff2', '.ttf'];
+                  const excludePatterns = ['/cover/', '/poster/', '/backdrop/', '/image/', '/img/', '/thumb/', '/avatar/'];
                   
                   const isValidPlayerUrl = (url) => {
                     if (!url) return false;
                     const lowerUrl = url.toLowerCase();
-                    return vidrameDomains.some(d => lowerUrl.includes(d)) || 
-                           lowerUrl.includes('player') || 
-                           lowerUrl.includes('embed') ||
-                           lowerUrl.includes('/e/') ||
-                           lowerUrl.includes('/v/');
+                    
+                    if (excludeExtensions.some(ext => lowerUrl.includes(ext))) return false;
+                    if (excludePatterns.some(pattern => lowerUrl.includes(pattern))) return false;
+                    if (lowerUrl.includes('hdfilmizle.life/v/')) return false;
+                    
+                    return vidrameDomains.some(d => lowerUrl.includes(d));
                   };
                   
                   const normalizeUrl = (src) => {
