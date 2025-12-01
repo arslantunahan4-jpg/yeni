@@ -89,7 +89,26 @@ Apple TV+ benzeri modern bir film ve dizi izleme uygulaması (Türkçe).
 - Vurgu: #0a84ff (mavi), #30d158 (yeşil)
 - Glass: rgba(255, 255, 255, 0.08-0.15)
 
-## Son Değişiklikler (30 Kasım 2025)
+## Son Değişiklikler (1 Aralık 2025)
+
+### TV Uzaktan Kumanda ve Klavye Kontrolleri
+- TV uzaktan kumanda tuş desteği geliştirildi:
+  - Ok tuşları (keyCode 37-40) ile navigasyon
+  - Geri tuşu desteği genişletildi (Samsung: 10009, LG: 461, XF86Back, BrowserBack)
+  - Enter/Select tuşları (keyCode 13, 195)
+  - Input alanlarında çalışırken tuş çakışması önlendi
+- Klavye ok tuşları ile tam navigasyon desteği
+- Space tuşu ile seçim (input alanları hariç)
+
+### HDFilmizle Scraper İyileştirmeleri
+- Vidrame iframe algılama kapsamlı şekilde geliştirildi
+- Desteklenen video kaynakları: vidrame, vidframe, rapid, vidmoly, closeload, fastload, hdplayer, videoseyred, supervideo, vidsrc, streamtape, mixdrop
+- Çoklu regex pattern desteği ile daha güvenilir iframe bulma
+- Script tag'leri içinde gömülü URL algılama
+- data-src, data-player, data-video attribute desteği
+- Lazy-load iframe desteği
+
+## Önceki Değişiklikler (30 Kasım 2025)
 
 ### NOXIS Sinematik İntro Animasyonu (The Genesis Sequence)
 - Yeni sinematik açılış sekansı eklendi (~12 saniye)
