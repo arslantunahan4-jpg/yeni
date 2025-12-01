@@ -101,22 +101,38 @@ export const useTVNavigation = (isModalOpen, isPlayerOpen) => {
     const lastFocus = useRef(null);
     useEffect(() => {
         const handleKeyDown = (e) => {
-            const getDirection = (key) => {
-                if (['ArrowUp', 'Up'].includes(key)) return 'up';
-                if (['ArrowDown', 'Down'].includes(key)) return 'down';
-                if (['ArrowLeft', 'Left'].includes(key)) return 'left';
-                if (['ArrowRight', 'Right'].includes(key)) return 'right';
+            const getDirection = (key, keyCode) => {
+                if (['ArrowUp', 'Up'].includes(key) || keyCode === 38) return 'up';
+                if (['ArrowDown', 'Down'].includes(key) || keyCode === 40) return 'down';
+                if (['ArrowLeft', 'Left'].includes(key) || keyCode === 37) return 'left';
+                if (['ArrowRight', 'Right'].includes(key) || keyCode === 39) return 'right';
                 return null;
             };
-            const direction = getDirection(e.key);
-            if (['Backspace', 'Escape', 'Esc'].includes(e.key) || e.keyCode === 10009 || e.keyCode === 461) {
-                if (e.key === 'Backspace' && document.activeElement.tagName === 'INPUT') return;
-                e.preventDefault(); window.history.back(); return;
+            const direction = getDirection(e.key, e.keyCode);
+            
+            const activeTag = document.activeElement?.tagName;
+            const isInInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag);
+            
+            const backKeyCodes = [10009, 461, 27, 10182, 166];
+            const isBackKey = ['Escape', 'Esc', 'XF86Back', 'BrowserBack'].includes(e.key) || backKeyCodes.includes(e.keyCode);
+            const isBackspace = e.key === 'Backspace' || e.keyCode === 8;
+            
+            if (isBackKey || (isBackspace && !isInInput)) {
+                e.preventDefault(); 
+                window.history.back(); 
+                return;
             }
-            if (document.activeElement.tagName === 'IFRAME') return;
-            if (e.key === 'Enter' || e.keyCode === 13) {
-                if (document.activeElement?.classList.contains('focusable') && !['SELECT', 'INPUT'].includes(document.activeElement.tagName)) {
-                    SoundManager.playSelect(); document.activeElement.click();
+            if (activeTag === 'IFRAME') return;
+            
+            const enterKeyCodes = [13, 195];
+            const isEnterKey = ['Enter', 'Select'].includes(e.key) || enterKeyCodes.includes(e.keyCode);
+            const isSpaceKey = e.key === ' ' || e.keyCode === 32;
+            
+            if (isEnterKey || (isSpaceKey && !isInInput)) {
+                if (document.activeElement?.classList.contains('focusable') && !isInInput) {
+                    e.preventDefault();
+                    SoundManager.playSelect(); 
+                    document.activeElement.click();
                 }
                 return;
             }

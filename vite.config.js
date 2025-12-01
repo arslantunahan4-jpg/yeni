@@ -403,65 +403,198 @@ function scraperPlugin() {
                   const html = response.data;
                   moviePageUrl = contentUrl;
                   
-                  const partsMatch = html.match(/let\s+parts\s*=\s*(\[[\s\S]*?\]);/);
-                  if (partsMatch) {
-                    try {
-                      const partsJson = partsMatch[1].replace(/\\"/g, '"').replace(/\\\//g, '/');
-                      const srcMatch = partsJson.match(/src=\\"([^"\\]+)\\"/);
-                      if (srcMatch) {
-                        iframeSrc = srcMatch[1];
-                        if (!iframeSrc.includes('?')) iframeSrc += '?ap=1';
-                        else if (!iframeSrc.includes('ap=')) iframeSrc += '&ap=1';
-                        console.log(`[HDFilmizle] Found in parts: ${iframeSrc}`);
+                  const vidrameDomains = ['vidrame', 'vidframe', 'rapid', 'vidmoly', 'closeload', 'fastload', 'hdplayer', 'videoseyred', 'supervideo', 'vidsrc', 'streamtape', 'mixdrop'];
+                  
+                  const isValidPlayerUrl = (url) => {
+                    if (!url) return false;
+                    const lowerUrl = url.toLowerCase();
+                    return vidrameDomains.some(d => lowerUrl.includes(d)) || 
+                           lowerUrl.includes('player') || 
+                           lowerUrl.includes('embed') ||
+                           lowerUrl.includes('/e/') ||
+                           lowerUrl.includes('/v/');
+                  };
+                  
+                  const normalizeUrl = (src) => {
+                    if (!src) return null;
+                    let url = src.trim();
+                    if (url.startsWith('//')) url = 'https:' + url;
+                    if (!url.startsWith('http')) return null;
+                    if (!url.includes('?')) url += '?ap=1';
+                    else if (!url.includes('ap=')) url += '&ap=1';
+                    return url;
+                  };
+                  
+                  const partsPatterns = [
+                    /let\s+parts\s*=\s*(\[[\s\S]*?\]);/,
+                    /var\s+parts\s*=\s*(\[[\s\S]*?\]);/,
+                    /const\s+parts\s*=\s*(\[[\s\S]*?\]);/,
+                    /parts\s*:\s*(\[[\s\S]*?\])/
+                  ];
+                  
+                  for (const pattern of partsPatterns) {
+                    if (iframeSrc) break;
+                    const partsMatch = html.match(pattern);
+                    if (partsMatch) {
+                      try {
+                        const partsJson = partsMatch[1].replace(/\\"/g, '"').replace(/\\\//g, '/').replace(/\\'/g, "'");
+                        const srcPatterns = [
+                          { pattern: /src=\\"([^"\\]+)\\"/g, hasGroup: true },
+                          { pattern: /src=\\'([^'\\]+)\\'/g, hasGroup: true },
+                          { pattern: /src="([^"]+)"/g, hasGroup: true },
+                          { pattern: /src='([^']+)'/g, hasGroup: true },
+                          { pattern: /"src"\s*:\s*"([^"]+)"/g, hasGroup: true },
+                          { pattern: /'src'\s*:\s*'([^']+)'/g, hasGroup: true },
+                          { pattern: /(https?:\/\/[^\s"'<>]+vidrame[^\s"'<>]*)/gi, hasGroup: true },
+                          { pattern: /(https?:\/\/[^\s"'<>]+vidframe[^\s"'<>]*)/gi, hasGroup: true },
+                          { pattern: /(\/\/[^\s"'<>]+vidrame[^\s"'<>]*)/gi, hasGroup: true }
+                        ];
+                        
+                        for (const { pattern, hasGroup } of srcPatterns) {
+                          let match;
+                          while ((match = pattern.exec(partsJson)) !== null) {
+                            const candidate = hasGroup ? (match[1] || match[0]) : match[0];
+                            if (candidate && isValidPlayerUrl(candidate)) {
+                              iframeSrc = normalizeUrl(candidate);
+                              if (iframeSrc) {
+                                console.log(`[HDFilmizle] Found in parts: ${iframeSrc}`);
+                                break;
+                              }
+                            }
+                          }
+                          if (iframeSrc) break;
+                        }
+                      } catch (e) {
+                        console.log(`[HDFilmizle] Parts parse error:`, e.message);
                       }
-                    } catch (e) {
-                      console.log(`[HDFilmizle] Parts parse error:`, e.message);
                     }
                   }
                   
                   if (!iframeSrc) {
-                    const iframeMatch = html.match(/iframe[^>]*src=["']([^"']+)["']/i);
-                    if (iframeMatch) {
-                      let src = iframeMatch[1];
-                      if (src.startsWith('//')) src = 'https:' + src;
-                      if (src.includes('vidframe') || src.includes('vidrame') || src.includes('rapid') || src.includes('player') || src.includes('embed')) {
-                        iframeSrc = src;
-                        if (!iframeSrc.includes('?')) iframeSrc += '?ap=1';
-                        else if (!iframeSrc.includes('ap=')) iframeSrc += '&ap=1';
-                        console.log(`[HDFilmizle] Found iframe via regex: ${iframeSrc}`);
+                    const iframePatterns = [
+                      /<iframe[^>]*src=["']([^"']+)["'][^>]*>/gi,
+                      /<iframe[^>]*data-src=["']([^"']+)["'][^>]*>/gi,
+                      /iframe[^>]*src=["']([^"']+)["']/gi
+                    ];
+                    
+                    for (const pattern of iframePatterns) {
+                      if (iframeSrc) break;
+                      let match;
+                      while ((match = pattern.exec(html)) !== null) {
+                        if (isValidPlayerUrl(match[1])) {
+                          iframeSrc = normalizeUrl(match[1]);
+                          if (iframeSrc) {
+                            console.log(`[HDFilmizle] Found iframe via regex: ${iframeSrc}`);
+                            break;
+                          }
+                        }
                       }
                     }
                   }
                   
                   if (!iframeSrc) {
                     const $ = cheerio.load(html);
-                    $('iframe').each((i, el) => {
+                    
+                    $('iframe, .player-container iframe, #player iframe, .video-container iframe, [class*="player"] iframe').each((i, el) => {
                       if (iframeSrc) return;
-                      const src = $(el).attr('data-src') || $(el).attr('src');
-                      if (src && (src.includes('vidframe') || src.includes('vidrame') || src.includes('rapid') || src.includes('player') || src.includes('embed'))) {
-                        iframeSrc = src.startsWith('//') ? 'https:' + src : src;
-                        if (!iframeSrc.includes('?')) iframeSrc += '?ap=1';
-                        else if (!iframeSrc.includes('ap=')) iframeSrc += '&ap=1';
-                        console.log(`[HDFilmizle] Found iframe via cheerio: ${iframeSrc}`);
+                      const src = $(el).attr('data-src') || $(el).attr('src') || $(el).attr('data-lazy-src') || $(el).attr('data-original');
+                      if (isValidPlayerUrl(src)) {
+                        iframeSrc = normalizeUrl(src);
+                        if (iframeSrc) console.log(`[HDFilmizle] Found iframe via cheerio: ${iframeSrc}`);
                       }
                     });
+                    
+                    if (!iframeSrc) {
+                      $('[data-player], [data-src], [data-video], [data-embed]').each((i, el) => {
+                        if (iframeSrc) return;
+                        const src = $(el).attr('data-player') || $(el).attr('data-src') || $(el).attr('data-video') || $(el).attr('data-embed');
+                        if (isValidPlayerUrl(src)) {
+                          iframeSrc = normalizeUrl(src);
+                          if (iframeSrc) console.log(`[HDFilmizle] Found via data attribute element: ${iframeSrc}`);
+                        }
+                      });
+                    }
                   }
                   
                   if (!iframeSrc) {
-                    const dataPlayerMatch = html.match(/data-player=["']([^"']+)["']/i);
-                    const embedMatch = html.match(/embed[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
-                    const playerMatch = html.match(/player[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
-                    const videoSrcMatch = html.match(/video[Ss]rc\s*[:=]\s*["']([^"']+)["']/);
+                    const attrPatterns = [
+                      /data-player=["']([^"']+)["']/gi,
+                      /data-src=["']([^"']+)["']/gi,
+                      /data-video=["']([^"']+)["']/gi,
+                      /data-embed=["']([^"']+)["']/gi,
+                      /embed[Uu]rl\s*[:=]\s*["']([^"']+)["']/g,
+                      /player[Uu]rl\s*[:=]\s*["']([^"']+)["']/g,
+                      /video[Ss]rc\s*[:=]\s*["']([^"']+)["']/g,
+                      /videoUrl\s*[:=]\s*["']([^"']+)["']/g,
+                      /streamUrl\s*[:=]\s*["']([^"']+)["']/g,
+                      /"url"\s*:\s*"([^"]+vidrame[^"]+)"/gi,
+                      /'url'\s*:\s*'([^']+vidrame[^']+)'/gi,
+                      /"file"\s*:\s*"([^"]+)"/gi,
+                      /"source"\s*:\s*"([^"]+)"/gi
+                    ];
                     
-                    const foundMatch = dataPlayerMatch || embedMatch || playerMatch || videoSrcMatch;
-                    if (foundMatch) {
-                      let src = foundMatch[1];
-                      if (src.startsWith('//')) src = 'https:' + src;
-                      iframeSrc = src;
-                      if (!iframeSrc.includes('?')) iframeSrc += '?ap=1';
-                      else if (!iframeSrc.includes('ap=')) iframeSrc += '&ap=1';
-                      console.log(`[HDFilmizle] Found via data attributes: ${iframeSrc}`);
+                    for (const pattern of attrPatterns) {
+                      if (iframeSrc) break;
+                      let match;
+                      while ((match = pattern.exec(html)) !== null) {
+                        if (isValidPlayerUrl(match[1])) {
+                          iframeSrc = normalizeUrl(match[1]);
+                          if (iframeSrc) {
+                            console.log(`[HDFilmizle] Found via data attributes: ${iframeSrc}`);
+                            break;
+                          }
+                        }
+                      }
                     }
+                  }
+                  
+                  if (!iframeSrc) {
+                    const directUrlPatterns = [
+                      /https?:\/\/[^\s"'<>]*vidrame\.[^\s"'<>]+/gi,
+                      /https?:\/\/[^\s"'<>]*vidframe\.[^\s"'<>]+/gi,
+                      /\/\/[^\s"'<>]*vidrame\.[^\s"'<>]+/gi,
+                      /\/\/[^\s"'<>]*vidframe\.[^\s"'<>]+/gi
+                    ];
+                    
+                    for (const pattern of directUrlPatterns) {
+                      if (iframeSrc) break;
+                      const match = html.match(pattern);
+                      if (match && match[0]) {
+                        iframeSrc = normalizeUrl(match[0]);
+                        if (iframeSrc) {
+                          console.log(`[HDFilmizle] Found direct vidrame URL: ${iframeSrc}`);
+                        }
+                      }
+                    }
+                  }
+                  
+                  if (!iframeSrc) {
+                    const $ = cheerio.load(html);
+                    $('script').each((i, el) => {
+                      if (iframeSrc) return;
+                      const scriptContent = $(el).html() || '';
+                      
+                      const scriptPatterns = [
+                        /["']([^"']*vidrame[^"']+)["']/gi,
+                        /["']([^"']*vidframe[^"']+)["']/gi,
+                        /src\s*[:=]\s*["']([^"']+)["']/gi,
+                        /url\s*[:=]\s*["']([^"']+embed[^"']+)["']/gi
+                      ];
+                      
+                      for (const pattern of scriptPatterns) {
+                        if (iframeSrc) break;
+                        let match;
+                        while ((match = pattern.exec(scriptContent)) !== null) {
+                          if (isValidPlayerUrl(match[1])) {
+                            iframeSrc = normalizeUrl(match[1]);
+                            if (iframeSrc) {
+                              console.log(`[HDFilmizle] Found in script: ${iframeSrc}`);
+                              break;
+                            }
+                          }
+                        }
+                      }
+                    });
                   }
                 } catch (e) {
                   console.log(`[HDFilmizle] Error fetching content:`, e.message);
