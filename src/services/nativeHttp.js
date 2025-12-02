@@ -1,5 +1,4 @@
-import { Capacitor } from '@capacitor/core';
-import { Http } from '@capacitor-community/http';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
 const isNative = Capacitor.isNativePlatform();
 
@@ -16,12 +15,14 @@ export const nativeGet = async (url, options = {}) => {
 
   if (isNative) {
     try {
-      const response = await Http.get({
+      console.log(`[NativeHttp] GET: ${url}`);
+      const response = await CapacitorHttp.get({
         url,
         headers,
         connectTimeout: options.timeout || 15000,
         readTimeout: options.timeout || 15000
       });
+      console.log(`[NativeHttp] Response status: ${response.status}`);
       return {
         ok: response.status >= 200 && response.status < 300,
         status: response.status,
@@ -75,7 +76,10 @@ export const scrapeHdfilmizle = async (title, year, isSeries = false, season = n
     console.log(`[NativeHttp] Searching: ${searchUrl}`);
     
     const response = await nativeGet(searchUrl, {
-      headers: { Referer: baseUrl + '/' },
+      headers: { 
+        Referer: baseUrl + '/',
+        Origin: baseUrl
+      },
       timeout: 10000
     });
     
@@ -153,7 +157,10 @@ export const scrapeHdfilmizle = async (title, year, isSeries = false, season = n
     for (const url of directUrls) {
       console.log(`[NativeHttp] Trying: ${url}`);
       const response = await nativeGet(url, {
-        headers: { Referer: baseUrl + '/' },
+        headers: { 
+          Referer: baseUrl + '/',
+          Origin: baseUrl
+        },
         timeout: 8000
       });
       
@@ -174,7 +181,10 @@ export const scrapeHdfilmizle = async (title, year, isSeries = false, season = n
       if (foundUrl && foundUrl !== moviePageUrl) {
         console.log(`[NativeHttp] Found via search: ${foundUrl}`);
         const response = await nativeGet(foundUrl, {
-          headers: { Referer: baseUrl + '/' },
+          headers: { 
+            Referer: baseUrl + '/',
+            Origin: baseUrl
+          },
           timeout: 8000
         });
         
