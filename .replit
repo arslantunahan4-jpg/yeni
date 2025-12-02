@@ -10,9 +10,10 @@ channel = "stable-25_05"
 packages = ["unzip", "imagemagick", "jdk17", "gradle", "android-tools", "zip"]
 
 [deployment]
-run = ["node", "index.js"]
+run = ["npm"]
 deploymentTarget = "autoscale"
 ignorePorts = false
+build = ["npm", "run", "build"]
 
 [agent]
 expertMode = true
