@@ -87,6 +87,25 @@ Apple TV+ benzeri modern bir film ve dizi izleme uygulaması (Türkçe).
 - `/api/video-proxy` - Video proxy (referrer spoofing)
 - `/api/stream-proxy/*` - HLS/stream proxy
 
+### Android APK Oluşturma (Önerilen)
+Türkçe kaynağın (hdfilmizle) tam çalışması için Android APK önerilir:
+
+```bash
+# Capgo Cloud Build (kurulum gerektirmez)
+npm install -g @capgo/cli
+capgo cloud-build android
+
+# Veya yerel build (Java JDK gerektirir)
+npm run cap:build
+```
+
+APK'da:
+- CORS sorunu yok (Native HTTP)
+- Telefon IP'si kullanılır (engellenmez)
+- Sunucu maliyeti yok
+
+Detaylı bilgi: `ANDROID_BUILD.md`
+
 ## Tasarım
 
 ### Responsive Breakpoints
