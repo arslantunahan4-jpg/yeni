@@ -4,9 +4,3 @@ android {
       targetCompatibility JavaVersion.VERSION_17
   }
 }
-
-apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
-
-if (hasProperty('postBuildExtras')) {
-  postBuildExtras()
-}
