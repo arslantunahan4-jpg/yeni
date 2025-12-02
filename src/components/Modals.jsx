@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartImage, ORIGINAL_IMG, BACKDROP_IMG, POSTER_IMG } from './Shared';
 import { fetchTMDB, isWatched, markAsWatched, saveContinueWatching } from '../hooks/useAppLogic';
+import { scrapeHdfilmizle, isNativePlatform } from '../services/nativeHttp';
 
 // --- YENİ EKLENEN: Slug Oluşturucu Yardımcı Fonksiyon ---
 // Film ismini botun anlayacağı URL formatına çevirir (Örn: "Hızlı ve Öfkeli" -> "hizli-ve-ofkeli")
@@ -348,14 +349,39 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
         const movieTitle = movie.title || movie.name;
         const originalTitle = movie.original_title || movie.original_name || movieTitle;
         const slug = createSlug(movieTitle);
-        const params = new URLSearchParams({ site, slug, title: movieTitle, original: originalTitle });
-        if (isSeries) {
-            params.append('s', initialSeason);
-            params.append('e', initialEpisode);
-        }
+        const year = (movie.release_date || movie.first_air_date || '').split('-')[0];
         
         try {
             console.log(`[Player] Scraping ${site} for: ${movieTitle} (${slug})`);
+            
+            if (site === 'hdfilmizle' && isNativePlatform()) {
+                console.log(`[Player] Using native HTTP for scraping`);
+                const result = await scrapeHdfilmizle(
+                    movieTitle, 
+                    year, 
+                    isSeries, 
+                    isSeries ? initialSeason : null, 
+                    isSeries ? initialEpisode : null
+                );
+                
+                if (result.success && result.iframeUrl) {
+                    console.log(`[Player] ✅ Found iframe (native): ${result.iframeUrl}`);
+                    setScrapedUrls(prev => ({ ...prev, [site]: result.iframeUrl }));
+                    setLoadingSource(null);
+                    return result.iframeUrl;
+                } else {
+                    console.log(`[Player] ❌ No iframe found (native)`, result);
+                    setLoadingSource(null);
+                    return null;
+                }
+            }
+            
+            const params = new URLSearchParams({ site, slug, title: movieTitle, original: originalTitle });
+            if (isSeries) {
+                params.append('s', initialSeason);
+                params.append('e', initialEpisode);
+            }
+            
             const res = await fetch(`/api/scrape-iframe?${params}`);
             const data = await res.json();
             
@@ -395,6 +421,9 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     
     const getUrl = useCallback(() => {
         if (source === 'hdfilmizle' && scrapedUrls.hdfilmizle) {
+            if (isNativePlatform()) {
+                return scrapedUrls.hdfilmizle;
+            }
             return `/api/video-proxy?url=${encodeURIComponent(scrapedUrls.hdfilmizle)}`;
         }
 

@@ -7,7 +7,10 @@
     "dev": "vite --port 5000 --host",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node server.js"
+    "start": "node server.js",
+    "cap:sync": "npm run build && npx cap sync android",
+    "cap:build": "npm run build && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "cap:build:release": "npm run build && npx cap sync android && cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
     "@capacitor-community/http": "^1.4.1",

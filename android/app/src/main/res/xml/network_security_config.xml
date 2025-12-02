@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">hdfilmizle.life</domain>
+        <domain includeSubdomains="true">vidrame.pro</domain>
+        <domain includeSubdomains="true">vidframe.pro</domain>
+        <domain includeSubdomains="true">multiembed.mov</domain>
+        <domain includeSubdomains="true">vidsrc.cc</domain>
+        <domain includeSubdomains="true">vsrc.su</domain>
+    </domain-config>
+</network-security-config>
