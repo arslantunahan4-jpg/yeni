@@ -69,6 +69,24 @@ Apple TV+ benzeri modern bir film ve dizi izleme uygulaması (Türkçe).
 4. Mobilde: Alt navigasyon çubuğunu kullanın
 5. PWA: Tarayıcıdan "Ana Ekrana Ekle" ile yükleyin
 
+## Dağıtım (Deployment)
+
+### Replit Üzerinden Dağıtım (Önerilen)
+- Express backend (server.js) ile tam API desteği
+- `npm run build` ile production build
+- `npm run start` ile production server başlatma
+- Publish butonuyla doğrudan yayınlama
+
+### Netlify Dağıtımı
+- Serverless functions ile API desteği
+- netlify/functions/ klasöründe scrape-iframe, video-proxy, stream-proxy
+- netlify.toml ile otomatik yapılandırma
+
+### API Endpoints
+- `/api/scrape-iframe` - Türkçe kaynak iframe scraping
+- `/api/video-proxy` - Video proxy (referrer spoofing)
+- `/api/stream-proxy/*` - HLS/stream proxy
+
 ## Tasarım
 
 ### Responsive Breakpoints

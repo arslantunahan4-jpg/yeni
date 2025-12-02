@@ -35,11 +35,11 @@ const searchWithQuery = async (query) => {
   try {
     const searchResponse = await axios.get(searchUrl, {
       headers: { ...headers, Referer: 'https://www.hdfilmizle.life/' },
-      timeout: 15000,
+      timeout: 10000,
       validateStatus: (status) => status < 500
     });
     
-    if (searchResponse.status === 200) {
+    if (searchResponse.status === 200 && searchResponse.data) {
       const $ = cheerio.load(searchResponse.data);
       const results = [];
       
@@ -222,8 +222,13 @@ exports.handler = async (event) => {
         try {
           const response = await axios.get(contentUrl, {
             headers: { ...headers, Referer: 'https://www.hdfilmizle.life/' },
-            timeout: 15000
+            timeout: 10000
           });
+          
+          if (!response.data) {
+            console.log(`[HDFilmizle] Empty response from: ${contentUrl}`);
+            throw new Error('Empty response');
+          }
           
           const html = response.data;
           moviePageUrl = contentUrl;

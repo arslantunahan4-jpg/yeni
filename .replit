@@ -10,7 +10,7 @@ channel = "stable-25_05"
 packages = ["unzip", "imagemagick", "jdk17", "gradle", "android-tools", "zip"]
 
 [deployment]
-run = ["npm"]
+run = ["npm", "run", "start"]
 deploymentTarget = "autoscale"
 ignorePorts = false
 build = ["npm", "run", "build"]
