@@ -18,6 +18,16 @@ const normalizeTitle = (t) => t.toLowerCase()
   .replace(/[üÜ]/g, 'u').replace(/[ıİ]/g, 'i').replace(/[öÖ]/g, 'o')
   .replace(/[^a-z0-9]/g, '');
 
+const normalizeUrl = (src) => {
+  if (!src) return null;
+  let url = src.trim();
+  if (url.startsWith('//')) url = 'https:' + url;
+  if (!url.startsWith('http')) return null;
+  if (!url.includes('?')) url += '?ap=1';
+  else if (!url.includes('ap=')) url += '&ap=1';
+  return url;
+};
+
 const searchWithQuery = async (query) => {
   const searchUrl = `https://www.hdfilmizle.life/?s=${encodeURIComponent(query)}`;
   console.log(`[HDFilmizle] Searching: ${searchUrl}`);
@@ -114,6 +124,7 @@ exports.handler = async (event) => {
 
   try {
     let iframeSrc = null;
+    let moviePageUrl = null;
 
     if (site === 'hdfilmizle') {
       const isTvSeries = season && episode;
@@ -215,33 +226,44 @@ exports.handler = async (event) => {
           });
           
           const html = response.data;
+          moviePageUrl = contentUrl;
           
-          const partsMatch = html.match(/let\s+parts\s*=\s*(\[[\s\S]*?\]);/);
-          if (partsMatch) {
-            try {
-              const partsJson = partsMatch[1].replace(/\\"/g, '"').replace(/\\\//g, '/');
-              const srcMatch = partsJson.match(/src=\\"([^"\\]+)\\"/);
-              if (srcMatch) {
-                iframeSrc = srcMatch[1];
-                if (!iframeSrc.includes('?')) iframeSrc += '?ap=1';
-                else if (!iframeSrc.includes('ap=')) iframeSrc += '&ap=1';
-                console.log(`[HDFilmizle] Found in parts: ${iframeSrc}`);
-              }
-            } catch (e) {
-              console.log(`[HDFilmizle] Parts parse error:`, e.message);
+          const vidramaMatch = html.match(/https?:\/\/vidrame\.pro\/[^\s"'<>\]\\]+/i);
+          if (vidramaMatch) {
+            let url = vidramaMatch[0].replace(/\\+/g, '');
+            iframeSrc = normalizeUrl(url);
+            console.log(`[HDFilmizle] Found vidrame.pro direct: ${iframeSrc}`);
+          }
+          
+          if (!iframeSrc) {
+            const vidframeMatch = html.match(/https?:\/\/vidframe[^\s"'<>\]\\]+/i);
+            if (vidframeMatch) {
+              let url = vidframeMatch[0].replace(/\\+/g, '');
+              iframeSrc = normalizeUrl(url);
+              console.log(`[HDFilmizle] Found vidframe direct: ${iframeSrc}`);
             }
           }
           
           if (!iframeSrc) {
-            const iframeMatch = html.match(/iframe[^>]*src=["']([^"']+)["']/i);
-            if (iframeMatch) {
-              let src = iframeMatch[1];
-              if (src.startsWith('//')) src = 'https:' + src;
-              if (src.includes('vidframe') || src.includes('vidrame') || src.includes('rapid') || src.includes('player') || src.includes('embed')) {
-                iframeSrc = src;
-                if (!iframeSrc.includes('?')) iframeSrc += '?ap=1';
-                else if (!iframeSrc.includes('ap=')) iframeSrc += '&ap=1';
-                console.log(`[HDFilmizle] Found iframe via regex: ${iframeSrc}`);
+            const protocolRelativeMatch = html.match(/\/\/vidrame\.pro\/[^\s"'<>\]\\]+/i);
+            if (protocolRelativeMatch) {
+              let url = 'https:' + protocolRelativeMatch[0].replace(/\\+/g, '');
+              iframeSrc = normalizeUrl(url);
+              console.log(`[HDFilmizle] Found vidrame.pro (protocol-relative): ${iframeSrc}`);
+            }
+          }
+          
+          if (!iframeSrc) {
+            const partsMatch = html.match(/let\s+parts\s*=\s*(\[[\s\S]*?\]);/);
+            if (partsMatch) {
+              const partsContent = partsMatch[1];
+              console.log(`[HDFilmizle] Found parts array, length: ${partsContent.length}`);
+              
+              const vidrameSrcMatch = partsContent.match(/vidrame\.pro[^\s"'<>\]\\]*/i);
+              if (vidrameSrcMatch) {
+                let url = 'https://' + vidrameSrcMatch[0].replace(/\\+/g, '');
+                iframeSrc = normalizeUrl(url);
+                console.log(`[HDFilmizle] Found in parts: ${iframeSrc}`);
               }
             }
           }
@@ -251,48 +273,102 @@ exports.handler = async (event) => {
             $('iframe').each((i, el) => {
               if (iframeSrc) return;
               const src = $(el).attr('data-src') || $(el).attr('src');
-              if (src && (src.includes('vidframe') || src.includes('vidrame') || src.includes('rapid') || src.includes('player') || src.includes('embed'))) {
-                iframeSrc = src.startsWith('//') ? 'https:' + src : src;
-                if (!iframeSrc.includes('?')) iframeSrc += '?ap=1';
-                else if (!iframeSrc.includes('ap=')) iframeSrc += '&ap=1';
-                console.log(`[HDFilmizle] Found iframe via cheerio: ${iframeSrc}`);
+              if (src && (src.includes('vidrame') || src.includes('vidframe'))) {
+                iframeSrc = normalizeUrl(src);
+                console.log(`[HDFilmizle] Found iframe element: ${iframeSrc}`);
               }
             });
           }
           
           if (!iframeSrc) {
-            const dataPlayerMatch = html.match(/data-player=["']([^"']+)["']/i);
-            const embedMatch = html.match(/embed[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
-            const playerMatch = html.match(/player[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
-            const videoSrcMatch = html.match(/video[Ss]rc\s*[:=]\s*["']([^"']+)["']/);
-            
-            const foundMatch = dataPlayerMatch || embedMatch || playerMatch || videoSrcMatch;
-            if (foundMatch) {
-              let src = foundMatch[1];
-              if (src.startsWith('//')) src = 'https:' + src;
-              iframeSrc = src;
-              if (!iframeSrc.includes('?')) iframeSrc += '?ap=1';
-              else if (!iframeSrc.includes('ap=')) iframeSrc += '&ap=1';
-              console.log(`[HDFilmizle] Found via data attributes: ${iframeSrc}`);
-            }
+            const $ = cheerio.load(html);
+            $('script').each((i, el) => {
+              if (iframeSrc) return;
+              const scriptContent = $(el).html() || '';
+              const vidrameSrcMatch = scriptContent.match(/https?:\/\/vidrame\.pro\/[^\s"'<>\]\\]+/i);
+              if (vidrameSrcMatch) {
+                iframeSrc = normalizeUrl(vidrameSrcMatch[0].replace(/\\+/g, ''));
+                console.log(`[HDFilmizle] Found in script tag: ${iframeSrc}`);
+              }
+            });
+          }
+          
+          if (!iframeSrc) {
+            console.log(`[HDFilmizle] No vidrame found. HTML sample (first 2000 chars):`);
+            console.log(html.substring(0, 2000));
           }
         } catch (e) {
           console.log(`[HDFilmizle] Error fetching content:`, e.message);
         }
       }
+    } else if (site === 'selcukflix') {
+      const urlVariations = [
+        `https://selcukflix.net/film/${slug}`,
+        `https://selcukflix.net/film/${slug}/izle`,
+        `https://selcukflix.net/${slug}`,
+        `https://selcukflix.net/film/${slug}-izle`,
+        `https://selcukflix.net/filmler/${slug}`
+      ];
+      
+      for (const tryUrl of urlVariations) {
+        try {
+          console.log(`[Selcukflix] Trying: ${tryUrl}`);
+          const response = await axios.get(tryUrl, { 
+            headers: { 
+              ...headers, 
+              Referer: 'https://selcukflix.net/',
+              Host: 'selcukflix.net'
+            },
+            timeout: 10000,
+            validateStatus: (status) => status < 500
+          });
+          
+          if (response.status === 200) {
+            moviePageUrl = tryUrl;
+            const html = response.data;
+            const $ = cheerio.load(html);
+            
+            $('iframe').each((i, el) => {
+              const src = $(el).attr('data-src') || $(el).attr('src');
+              if (src && !src.includes('google') && !src.includes('facebook') && !src.includes('ads')) {
+                iframeSrc = src.startsWith('//') ? 'https:' + src : src;
+                console.log(`[Selcukflix] Found iframe: ${iframeSrc}`);
+              }
+            });
+            
+            if (!iframeSrc) {
+              const playerMatch = html.match(/player[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
+              const embedMatch = html.match(/embed[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
+              const videoMatch = html.match(/video[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
+              const match = playerMatch || embedMatch || videoMatch;
+              if (match) {
+                iframeSrc = match[1].startsWith('//') ? 'https:' + match[1] : match[1];
+                console.log(`[Selcukflix] Found player URL: ${iframeSrc}`);
+              }
+            }
+            
+            if (iframeSrc) break;
+          }
+        } catch (e) {
+          console.log(`[Selcukflix] Error trying ${tryUrl}:`, e.message);
+          continue;
+        }
+      }
     }
 
     if (iframeSrc) {
+      console.log(`[Scraper] Success! URL: ${iframeSrc}`);
       return {
         statusCode: 200,
         headers: corsHeaders,
-        body: JSON.stringify({ success: true, url: iframeSrc })
+        body: JSON.stringify({ success: true, url: iframeSrc, moviePage: moviePageUrl })
       };
     } else {
+      console.log(`[Scraper] No iframe found for ${site}/${slug}`);
       return {
         statusCode: 200,
         headers: corsHeaders,
-        body: JSON.stringify({ success: false, error: 'Iframe bulunamadı' })
+        body: JSON.stringify({ success: false, error: 'Iframe bulunamadı', moviePage: moviePageUrl })
       };
     }
   } catch (error) {

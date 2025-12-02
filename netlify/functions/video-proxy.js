@@ -29,16 +29,22 @@ exports.handler = async (event) => {
 
     const proxyHeaders = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
       'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Accept-Encoding': 'gzip, deflate, br',
       'Connection': 'keep-alive',
       'Upgrade-Insecure-Requests': '1',
       'Sec-Fetch-Dest': 'iframe',
       'Sec-Fetch-Mode': 'navigate',
       'Sec-Fetch-Site': 'cross-site',
+      'Sec-Fetch-User': '?1',
+      'Sec-CH-UA': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+      'Sec-CH-UA-Mobile': '?0',
+      'Sec-CH-UA-Platform': '"Windows"',
       'Referer': hdfilmizleReferer,
       'Origin': hdfilmizleOrigin,
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
     };
 
     console.log(`[VideoProxy] Fetching: ${targetUrl}`);
@@ -79,6 +85,15 @@ exports.handler = async (event) => {
             get: function() { return 'hdfilmizle.life'; },
             set: function() {}
           });
+          window.__originalFetch = window.fetch;
+          window.fetch = function(url, options) {
+            options = options || {};
+            options.headers = options.headers || {};
+            if (typeof url === 'string' && !url.startsWith('data:')) {
+              options.headers['X-Requested-With'] = 'XMLHttpRequest';
+            }
+            return window.__originalFetch(url, options);
+          };
         </script>`
       );
       
