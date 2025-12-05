@@ -9,14 +9,44 @@ export const ORIGINAL_IMG = "https://image.tmdb.org/t/p/original";
 export const SmartImage = memo(({ src, alt, style, className }) => {
     const [loaded, setLoaded] = useState(false);
     const [error, setError] = useState(false);
+    const [shouldLoad, setShouldLoad] = useState(false);
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+
+        // If already triggered to load, we don't need to observe anymore
+        if (shouldLoad) return;
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    setShouldLoad(true);
+                    observer.disconnect();
+                }
+            });
+        }, {
+            rootMargin: '200px' // Start loading before it comes into view
+        });
+
+        observer.observe(containerRef.current);
+
+        return () => {
+            if (observer) observer.disconnect();
+        };
+    }, [shouldLoad]);
     
     return (
-        <div className={className} style={{ 
-            ...style, 
-            position: 'relative', 
-            backgroundColor: '#0a0a0a', 
-            overflow: 'hidden' 
-        }}>
+        <div
+            ref={containerRef}
+            className={className}
+            style={{
+                ...style,
+                position: 'relative',
+                backgroundColor: '#0a0a0a',
+                overflow: 'hidden'
+            }}
+        >
             {!loaded && !error && (
                 <div className="skeleton" style={{ position: 'absolute', inset: 0 }} />
             )}
@@ -33,20 +63,22 @@ export const SmartImage = memo(({ src, alt, style, className }) => {
                     <i className="fas fa-film"></i>
                 </div>
             )}
-            <img 
-                src={src} 
-                alt={alt} 
-                onLoad={() => setLoaded(true)} 
-                onError={() => setError(true)}
-                style={{ 
-                    width: '100%', 
-                    height: '100%', 
-                    objectFit: 'cover', 
-                    opacity: loaded ? 1 : 0, 
-                    transition: 'opacity 0.5s ease-out, transform 0.5s ease-out', 
-                    transform: loaded ? 'scale(1)' : 'scale(1.03)' 
-                }} 
-            />
+            {shouldLoad && (
+                <img
+                    src={src}
+                    alt={alt}
+                    onLoad={() => setLoaded(true)}
+                    onError={() => setError(true)}
+                    style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        opacity: loaded ? 1 : 0,
+                        transition: 'opacity 0.5s ease-out, transform 0.5s ease-out',
+                        transform: loaded ? 'scale(1)' : 'scale(1.03)'
+                    }}
+                />
+            )}
         </div>
     );
 });
