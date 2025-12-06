@@ -3,6 +3,16 @@ import react from "@vitejs/plugin-react";
 import axios from "axios";
 import * as cheerio from "cheerio";
 
+const createSlug = (text) => {
+    if (!text) return "";
+    const trMap = { 'ç': 'c', 'ğ': 'g', 'ş': 's', 'ü': 'u', 'ı': 'i', 'ö': 'o', 'Ç': 'c', 'Ğ': 'g', 'Ş': 's', 'Ü': 'u', 'İ': 'i', 'Ö': 'o' };
+    return text.split('').map(char => trMap[char] || char).join('')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+};
+
 function scraperPlugin() {
   return {
     name: 'scraper-api',
@@ -12,7 +22,14 @@ function scraperPlugin() {
         if (req.url.startsWith('/api/video-proxy')) {
           const url = new URL(req.url, 'http://localhost');
           const targetUrl = url.searchParams.get('url');
+          const targetReferer = url.searchParams.get('referer') || 'https://www.hdfilmizle.life/';
+          const targetOrigin = url.searchParams.get('origin') || (targetReferer ? new URL(targetReferer).origin : 'https://www.hdfilmizle.life');
           
+          let targetDomain = 'hdfilmizle.life';
+          try {
+              targetDomain = new URL(targetReferer).hostname.replace('www.', '');
+          } catch (e) {}
+
           if (!targetUrl) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
@@ -23,9 +40,6 @@ function scraperPlugin() {
           try {
             const parsedUrl = new URL(targetUrl);
             const targetHost = parsedUrl.host;
-            
-            const hdfilmizleReferer = 'https://www.hdfilmizle.life/';
-            const hdfilmizleOrigin = 'https://www.hdfilmizle.life';
             
             const proxyHeaders = {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
@@ -41,14 +55,14 @@ function scraperPlugin() {
               'Sec-CH-UA': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
               'Sec-CH-UA-Mobile': '?0',
               'Sec-CH-UA-Platform': '"Windows"',
-              'Referer': hdfilmizleReferer,
-              'Origin': hdfilmizleOrigin,
+              'Referer': targetReferer,
+              'Origin': targetOrigin,
               'Cache-Control': 'no-cache',
               'Pragma': 'no-cache'
             };
 
             console.log(`[VideoProxy] Fetching: ${targetUrl}`);
-            console.log(`[VideoProxy] Using Referer: ${hdfilmizleReferer}`);
+            console.log(`[VideoProxy] Using Referer: ${targetReferer}`);
 
             const response = await axios.get(targetUrl, {
               headers: proxyHeaders,
@@ -76,20 +90,20 @@ function scraperPlugin() {
                 html = html.replace(/<head([^>]*)>/i, `<head$1><base href="${baseUrl}/">`);
               }
               
-              html = html.replace(/document\.referrer/g, `"${hdfilmizleReferer}"`);
-              html = html.replace(/window\.location\.ancestorOrigins/g, `["${hdfilmizleOrigin}"]`);
-              html = html.replace(/parent\.location/g, `{href:"${hdfilmizleReferer}",origin:"${hdfilmizleOrigin}"}`);
-              html = html.replace(/top\.location/g, `{href:"${hdfilmizleReferer}",origin:"${hdfilmizleOrigin}"}`);
+              html = html.replace(/document\.referrer/g, `"${targetReferer}"`);
+              html = html.replace(/window\.location\.ancestorOrigins/g, `["${targetOrigin}"]`);
+              html = html.replace(/parent\.location/g, `{href:"${targetReferer}",origin:"${targetOrigin}"}`);
+              html = html.replace(/top\.location/g, `{href:"${targetReferer}",origin:"${targetOrigin}"}`);
               
               html = html.replace(
                 /<head([^>]*)>/i,
                 `<head$1>
                 <script>
                   Object.defineProperty(document, 'referrer', {
-                    get: function() { return '${hdfilmizleReferer}'; }
+                    get: function() { return '${targetReferer}'; }
                   });
                   Object.defineProperty(document, 'domain', {
-                    get: function() { return 'hdfilmizle.life'; },
+                    get: function() { return '${targetDomain}'; },
                     set: function() {}
                   });
                   window.__originalFetch = window.fetch;
@@ -222,7 +236,102 @@ function scraperPlugin() {
             let iframeSrc = null;
             let moviePageUrl = null;
 
-            if (site === 'hdfilmizle') {
+            if (site === 'yabancidizibox') {
+                console.log(`[YabanciDiziBox] Searching for: "${title}" / "${originalTitle}" (slug: ${slug})`);
+
+                const isTvSeries = season && episode;
+                const searchUrl = `https://yabancidizibox.com/?s=${encodeURIComponent(title)}`;
+
+                try {
+                    const searchResponse = await axios.get(searchUrl, {
+                        headers: { ...headers, Referer: 'https://yabancidizibox.com/' },
+                        timeout: 10000
+                    });
+
+                    let contentUrl = null;
+                    if (searchResponse.status === 200) {
+                        const $ = cheerio.load(searchResponse.data);
+                        const results = [];
+                        $('.result-item, .poster, .movie, article').each((i, el) => {
+                            const $el = $(el);
+                            const link = $el.find('a').attr('href');
+                            const resultTitle = $el.text().toLowerCase();
+                            if (link) {
+                                results.push({ link, title: resultTitle });
+                            }
+                        });
+
+                        const normalizeTitle = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        const normalizedTitle = normalizeTitle(title);
+                        const bestMatch = results.find(r => normalizeTitle(r.title).includes(normalizedTitle));
+
+                        if (bestMatch) {
+                            contentUrl = bestMatch.link;
+                        }
+                    }
+
+                    if (!contentUrl) {
+                        const baseSlug = createSlug ? createSlug(originalTitle || title) : slug;
+                        if (isTvSeries) {
+                            contentUrl = `https://yabancidizibox.com/dizi/${baseSlug}`;
+                        } else {
+                            contentUrl = `https://yabancidizibox.com/film/${baseSlug}`;
+                        }
+                    }
+
+                    if (contentUrl && isTvSeries) {
+                        if (!contentUrl.includes('sezon-') && !contentUrl.includes('bolum-')) {
+                            const cleanUrl = contentUrl.endsWith('/') ? contentUrl.slice(0, -1) : contentUrl;
+                            contentUrl = `${cleanUrl}/sezon-${season}-bolum-${episode}`;
+                        }
+                    }
+
+                    console.log(`[YabanciDiziBox] Fetching content from: ${contentUrl}`);
+
+                    const contentResponse = await axios.get(contentUrl, {
+                        headers: { ...headers, Referer: 'https://yabancidizibox.com/' },
+                        timeout: 10000,
+                        validateStatus: (status) => status < 500
+                    });
+
+                    if (contentResponse.status === 200) {
+                        moviePageUrl = contentUrl;
+                        const html = contentResponse.data;
+                        const $ = cheerio.load(html);
+
+                        const normalizeUrl = (src) => {
+                          if (!src) return null;
+                          let url = src.trim();
+                          if (url.startsWith('//')) url = 'https:' + url;
+                          if (!url.startsWith('http')) return null;
+                          if (!url.includes('?')) url += '?ap=1';
+                          else if (!url.includes('ap=')) url += '&ap=1';
+                          return url;
+                        };
+
+                        $('iframe').each((i, el) => {
+                            if (iframeSrc) return;
+                            const src = $(el).attr('src') || $(el).attr('data-src');
+                            if (src && !src.includes('facebook') && !src.includes('google')) {
+                                iframeSrc = normalizeUrl(src);
+                                console.log(`[YabanciDiziBox] Found iframe: ${iframeSrc}`);
+                            }
+                        });
+
+                        if (!iframeSrc) {
+                            const match = html.match(/(?:source|src|file|video_url)["']?\s*:\s*["']([^"']+)["']/i);
+                            if (match) {
+                                iframeSrc = normalizeUrl(match[1]);
+                                console.log(`[YabanciDiziBox] Found source in script: ${iframeSrc}`);
+                            }
+                        }
+                    }
+
+                } catch (e) {
+                    console.log(`[YabanciDiziBox] Error: ${e.message}`);
+                }
+
+            } else if (site === 'hdfilmizle') {
               const isTvSeries = season && episode;
               
               console.log(`[HDFilmizle] Searching for: "${title}" / "${originalTitle}" (slug: ${slug})`);

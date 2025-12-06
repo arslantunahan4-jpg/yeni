@@ -470,7 +470,9 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
             if (isNativePlatform()) {
                 return scrapedUrls[source];
             }
-            return `/api/video-proxy?url=${encodeURIComponent(scrapedUrls[source])}`;
+            const targetUrl = scrapedUrls[source];
+            const referer = source === 'yabancidizibox' ? 'https://yabancidizibox.com/' : 'https://www.hdfilmizle.life/';
+            return `/api/video-proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(referer)}`;
         }
 
         if (source === 'multiembed') {
