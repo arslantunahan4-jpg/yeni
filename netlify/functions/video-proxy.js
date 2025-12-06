@@ -28,23 +28,24 @@ exports.handler = async (event) => {
     const hdfilmizleOrigin = 'https://www.hdfilmizle.life';
 
     const proxyHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
       'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-      'Accept-Encoding': 'gzip, deflate, br',
+      'Accept-Encoding': 'gzip, deflate, br, zstd',
       'Connection': 'keep-alive',
       'Upgrade-Insecure-Requests': '1',
       'Sec-Fetch-Dest': 'iframe',
       'Sec-Fetch-Mode': 'navigate',
       'Sec-Fetch-Site': 'cross-site',
       'Sec-Fetch-User': '?1',
-      'Sec-CH-UA': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
-      'Sec-CH-UA-Mobile': '?0',
-      'Sec-CH-UA-Platform': '"Windows"',
+      'Sec-Ch-Ua': '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
+      'Sec-Ch-Ua-Mobile': '?0',
+      'Sec-Ch-Ua-Platform': '"Windows"',
       'Referer': hdfilmizleReferer,
       'Origin': hdfilmizleOrigin,
       'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache'
+      'Pragma': 'no-cache',
+      'Dnt': '1'
     };
 
     console.log(`[VideoProxy] Fetching: ${targetUrl}`);
