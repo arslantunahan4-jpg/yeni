@@ -103,8 +103,10 @@ exports.handler = async (event) => {
               // Check if already proxied
               if (absoluteUrl.includes(PROXY_URL)) return absoluteUrl;
 
-              // Encode and proxy
-              return PROXY_URL + '?url=' + encodeURIComponent(absoluteUrl) + '&referer=' + encodeURIComponent(ORIGINAL_REFERER);
+              // For sub-resources, use the current page's base URL as the Referer
+              // This mimics standard browser behavior where resources loaded by a page
+              // send that page's URL as the Referer.
+              return PROXY_URL + '?url=' + encodeURIComponent(absoluteUrl) + '&referer=' + encodeURIComponent(BASE_URL);
             }
 
             // --- Intercept Fetch ---

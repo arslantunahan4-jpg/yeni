@@ -109,7 +109,7 @@ function scraperPlugin() {
 
                       if (absoluteUrl.includes(PROXY_URL)) return absoluteUrl;
 
-                      return PROXY_URL + '?url=' + encodeURIComponent(absoluteUrl) + '&referer=' + encodeURIComponent(ORIGINAL_REFERER);
+                      return PROXY_URL + '?url=' + encodeURIComponent(absoluteUrl) + '&referer=' + encodeURIComponent(BASE_URL);
                     }
 
                     const originalFetch = window.fetch;
