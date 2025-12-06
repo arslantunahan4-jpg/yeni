@@ -6,17 +6,25 @@ export const POSTER_IMG = "https://image.tmdb.org/t/p/w780";
 export const BACKDROP_IMG = "https://image.tmdb.org/t/p/w1280";
 export const ORIGINAL_IMG = "https://image.tmdb.org/t/p/original";
 
+// Global cache for loaded image URLs to prevent re-fetching/fading
+const loadedImageUrls = new Set();
+
 export const SmartImage = memo(({ src, alt, style, className }) => {
-    const [loaded, setLoaded] = useState(false);
+    const isCached = loadedImageUrls.has(src);
+    const [loaded, setLoaded] = useState(isCached);
     const [error, setError] = useState(false);
-    const [shouldLoad, setShouldLoad] = useState(false);
+    const [shouldLoad, setShouldLoad] = useState(isCached);
     const containerRef = useRef(null);
 
     useEffect(() => {
-        if (!containerRef.current) return;
+        const cached = loadedImageUrls.has(src);
+        setLoaded(cached);
+        setShouldLoad(cached);
+        setError(false);
+    }, [src]);
 
-        // If already triggered to load, we don't need to observe anymore
-        if (shouldLoad) return;
+    useEffect(() => {
+        if (!containerRef.current || shouldLoad) return;
 
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
@@ -35,6 +43,11 @@ export const SmartImage = memo(({ src, alt, style, className }) => {
             if (observer) observer.disconnect();
         };
     }, [shouldLoad]);
+
+    const handleLoad = () => {
+        setLoaded(true);
+        if (src) loadedImageUrls.add(src);
+    };
     
     return (
         <div
@@ -67,14 +80,14 @@ export const SmartImage = memo(({ src, alt, style, className }) => {
                 <img
                     src={src}
                     alt={alt}
-                    onLoad={() => setLoaded(true)}
+                    onLoad={handleLoad}
                     onError={() => setError(true)}
                     style={{
                         width: '100%',
                         height: '100%',
                         objectFit: 'cover',
                         opacity: loaded ? 1 : 0,
-                        transition: 'opacity 0.5s ease-out, transform 0.5s ease-out',
+                        transition: loadedImageUrls.has(src) ? 'none' : 'opacity 0.5s ease-out, transform 0.5s ease-out',
                         transform: loaded ? 'scale(1)' : 'scale(1.03)'
                     }}
                 />
