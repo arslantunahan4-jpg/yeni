@@ -26,6 +26,19 @@ export const DetailModal = ({ movie, onClose, onPlay, onOpenDetail, apiKey }) =>
     const [showTrailer, setShowTrailer] = useState(false);
     const isSeries = movie.media_type === 'tv' || movie.first_air_date;
 
+    const episodesRef = useRef(null);
+    const similarRef = useRef(null);
+
+    const handleScroll = (ref, direction) => {
+        if (ref.current) {
+            const scrollAmount = window.innerWidth * 0.7;
+            ref.current.scrollBy({
+                left: direction === 'left' ? -scrollAmount : scrollAmount,
+                behavior: 'smooth'
+            });
+        }
+    };
+
     useEffect(() => { 
         setTimeout(() => { 
             document.querySelector('.detail-play-btn')?.focus(); 
@@ -202,63 +215,79 @@ export const DetailModal = ({ movie, onClose, onPlay, onOpenDetail, apiKey }) =>
                                     </select>
                                 )}
                             </div>
-                            <div className="row-scroll-container" style={{ paddingLeft: 0, marginLeft: '-16px', paddingRight: '16px' }}>
-                                {episodes.map(ep => (
-                                    <button 
-                                        key={ep.id} 
-                                        tabIndex="0" 
-                                        onClick={() => handlePlayEpisode(selectedSeason, ep.episode_number)} 
-                                        className="focusable episode-card"
-                                        style={{ padding: 0 }}
-                                    >
-                                        {isWatched(movie.id, selectedSeason, ep.episode_number) && (
-                                            <div className="watched-badge">
-                                                <i className="fas fa-check"></i>
+                            <div style={{ position: 'relative' }}>
+                                <button
+                                    className="scroll-btn left"
+                                    onClick={() => handleScroll(episodesRef, 'left')}
+                                    tabIndex="-1"
+                                >
+                                    <i className="fas fa-chevron-left"></i>
+                                </button>
+                                <div ref={episodesRef} className="row-scroll-container" style={{ paddingLeft: 0, marginLeft: '-16px', paddingRight: '16px' }}>
+                                    {episodes.map(ep => (
+                                        <button
+                                            key={ep.id}
+                                            tabIndex="0"
+                                            onClick={() => handlePlayEpisode(selectedSeason, ep.episode_number)}
+                                            className="focusable episode-card"
+                                            style={{ padding: 0 }}
+                                        >
+                                            {isWatched(movie.id, selectedSeason, ep.episode_number) && (
+                                                <div className="watched-badge">
+                                                    <i className="fas fa-check"></i>
+                                                </div>
+                                            )}
+                                            <div style={{ aspectRatio: '16/9', position: 'relative' }}>
+                                                <SmartImage
+                                                    src={ep.still_path ? BACKDROP_IMG + ep.still_path : ''}
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                />
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    bottom: '8px',
+                                                    left: '8px',
+                                                    background: 'rgba(0,0,0,0.75)',
+                                                    backdropFilter: 'blur(10px)',
+                                                    padding: '4px 8px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '12px',
+                                                    color: 'white',
+                                                    fontWeight: '600'
+                                                }}>
+                                                    {ep.episode_number}. Bölüm
+                                                </div>
                                             </div>
-                                        )}
-                                        <div style={{ aspectRatio: '16/9', position: 'relative' }}>
-                                            <SmartImage 
-                                                src={ep.still_path ? BACKDROP_IMG + ep.still_path : ''} 
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                                            />
-                                            <div style={{
-                                                position: 'absolute',
-                                                bottom: '8px',
-                                                left: '8px',
-                                                background: 'rgba(0,0,0,0.75)',
-                                                backdropFilter: 'blur(10px)',
-                                                padding: '4px 8px',
-                                                borderRadius: '6px',
-                                                fontSize: '12px',
-                                                color: 'white',
-                                                fontWeight: '600'
-                                            }}>
-                                                {ep.episode_number}. Bölüm
+                                            <div style={{ padding: '14px', position: 'relative', zIndex: 2 }}>
+                                                <div style={{
+                                                    fontWeight: '700',
+                                                    color: 'white',
+                                                    marginBottom: '6px',
+                                                    fontSize: '14px'
+                                                }}>
+                                                    {ep.name}
+                                                </div>
+                                                <p style={{
+                                                    fontSize: '12px',
+                                                    color: 'rgba(255,255,255,0.6)',
+                                                    display: '-webkit-box',
+                                                    WebkitLineClamp: 2,
+                                                    WebkitBoxOrient: 'vertical',
+                                                    overflow: 'hidden',
+                                                    lineHeight: '1.4'
+                                                }}>
+                                                    {ep.overview || "Özet bulunmuyor."}
+                                                </p>
                                             </div>
-                                        </div>
-                                        <div style={{ padding: '14px', position: 'relative', zIndex: 2 }}>
-                                            <div style={{
-                                                fontWeight: '700',
-                                                color: 'white',
-                                                marginBottom: '6px',
-                                                fontSize: '14px'
-                                            }}>
-                                                {ep.name}
-                                            </div>
-                                            <p style={{
-                                                fontSize: '12px',
-                                                color: 'rgba(255,255,255,0.6)',
-                                                display: '-webkit-box',
-                                                WebkitLineClamp: 2,
-                                                WebkitBoxOrient: 'vertical',
-                                                overflow: 'hidden',
-                                                lineHeight: '1.4'
-                                            }}>
-                                                {ep.overview || "Özet bulunmuyor."}
-                                            </p>
-                                        </div>
-                                    </button>
-                                ))}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button
+                                    className="scroll-btn right"
+                                    onClick={() => handleScroll(episodesRef, 'right')}
+                                    tabIndex="-1"
+                                >
+                                    <i className="fas fa-chevron-right"></i>
+                                </button>
                             </div>
                         </div>
                     )}
@@ -272,34 +301,50 @@ export const DetailModal = ({ movie, onClose, onPlay, onOpenDetail, apiKey }) =>
                             }}>
                                 Benzerleri
                             </h3>
-                            <div className="row-scroll-container" style={{ paddingLeft: 0, marginLeft: '-16px', paddingRight: '16px' }}>
-                                {similar.map(s => s.poster_path && (
-                                    <button 
-                                        key={s.id} 
-                                        tabIndex="0" 
-                                        onClick={() => {
-                                            const similarItem = {
-                                                ...s,
-                                                media_type: isSeries ? 'tv' : 'movie'
-                                            };
-                                            onClose(); 
-                                            setTimeout(() => {
-                                                if (onOpenDetail) {
-                                                    onOpenDetail(similarItem);
-                                                }
-                                            }, 300);
-                                        }} 
-                                        className="focusable poster-card card-portrait"
-                                    >
-                                        <SmartImage 
-                                            src={POSTER_IMG + s.poster_path} 
-                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                                        />
-                                        <div className="card-overlay">
-                                            <span className="card-title">{s.title || s.name}</span>
-                                        </div>
-                                    </button>
-                                ))}
+                            <div style={{ position: 'relative' }}>
+                                <button
+                                    className="scroll-btn left"
+                                    onClick={() => handleScroll(similarRef, 'left')}
+                                    tabIndex="-1"
+                                >
+                                    <i className="fas fa-chevron-left"></i>
+                                </button>
+                                <div ref={similarRef} className="row-scroll-container" style={{ paddingLeft: 0, marginLeft: '-16px', paddingRight: '16px' }}>
+                                    {similar.map(s => s.poster_path && (
+                                        <button
+                                            key={s.id}
+                                            tabIndex="0"
+                                            onClick={() => {
+                                                const similarItem = {
+                                                    ...s,
+                                                    media_type: isSeries ? 'tv' : 'movie'
+                                                };
+                                                onClose();
+                                                setTimeout(() => {
+                                                    if (onOpenDetail) {
+                                                        onOpenDetail(similarItem);
+                                                    }
+                                                }, 300);
+                                            }}
+                                            className="focusable poster-card card-portrait"
+                                        >
+                                            <SmartImage
+                                                src={POSTER_IMG + s.poster_path}
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                            />
+                                            <div className="card-overlay">
+                                                <span className="card-title">{s.title || s.name}</span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                                <button
+                                    className="scroll-btn right"
+                                    onClick={() => handleScroll(similarRef, 'right')}
+                                    tabIndex="-1"
+                                >
+                                    <i className="fas fa-chevron-right"></i>
+                                </button>
                             </div>
                         </div>
                     )}

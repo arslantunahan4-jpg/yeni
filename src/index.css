@@ -1946,3 +1946,71 @@ iframe.focusable:focus {
   color: white;
   transform: scale(1.05);
 }
+
+/* Scroll Buttons */
+.scroll-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 20;
+  transition: all 0.3s ease;
+  opacity: 1;
+  pointer-events: auto;
+  font-size: 18px;
+}
+
+.scroll-btn.left {
+  left: 0;
+}
+
+.scroll-btn.right {
+  right: 0;
+}
+
+/* Show buttons on hover or focus */
+.row-wrapper:hover .scroll-btn,
+.detail-content-layer div:hover > .scroll-btn,
+.scroll-btn:focus {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Always show on touch devices if hover is not available (optional, but CSS can't detect touch easily without media queries)
+   Alternatively, just rely on hover for mouse and swipe for touch. */
+
+.scroll-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+}
+
+.scroll-btn:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+/* Adjust for Detail Modal specific positioning */
+.detail-content-layer .scroll-btn {
+  top: 45%; /* Slightly higher to center on cards */
+}
+
+@media (max-width: 768px) {
+  /* On mobile, maybe hide them because swipe is better?
+     Or keep them small. Let's keep them but maybe always visible or relying on user tapping.
+     Actually, standard UX for horizontal scroll on mobile is just swipe.
+     Buttons might obstruct view. */
+  .scroll-btn {
+    display: none;
+  }
+}
