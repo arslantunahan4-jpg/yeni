@@ -27,7 +27,9 @@ function scraperPlugin() {
           
           let targetDomain = 'hdfilmizle.life';
           try {
-              targetDomain = new URL(targetReferer).hostname.replace('www.', '');
+              if (targetReferer) {
+                targetDomain = new URL(targetReferer).hostname.replace('www.', '');
+              }
           } catch (e) {}
 
           if (!targetUrl) {
@@ -85,43 +87,62 @@ function scraperPlugin() {
               
               const baseUrl = `${parsedUrl.protocol}//${parsedUrl.host}`;
               
-              if (!html.includes('<base')) {
-                html = html.replace(/<head([^>]*)>/i, `<head$1><base href="${baseUrl}/">`);
-              }
-              
-              html = html.replace(/document\.referrer/g, `"${targetReferer}"`);
-              html = html.replace(/window\.location\.ancestorOrigins/g, `["${targetOrigin}"]`);
-              html = html.replace(/parent\.location/g, `{href:"${targetReferer}",origin:"${targetOrigin}"}`);
-              html = html.replace(/top\.location/g, `{href:"${targetReferer}",origin:"${targetOrigin}"}`);
-              
-              html = html.replace(
-                /<head([^>]*)>/i,
-                `<head$1>
+              const interceptorScript = `
                 <script>
-                  Object.defineProperty(document, 'referrer', {
-                    get: function() { return '${targetReferer}'; }
-                  });
-                  Object.defineProperty(document, 'domain', {
-                    get: function() { return '${targetDomain}'; },
-                    set: function() {}
-                  });
-                  window.__originalFetch = window.fetch;
-                  window.fetch = function(url, options) {
-                    options = options || {};
-                    options.headers = options.headers || {};
-                    if (typeof url === 'string' && !url.startsWith('data:')) {
-                      options.headers['X-Requested-With'] = 'XMLHttpRequest';
+                  (function() {
+                    const PROXY_URL = '/api/video-proxy';
+                    const ORIGINAL_REFERER = '${targetReferer}';
+                    const BASE_URL = '${baseUrl}';
+
+                    function rewriteUrl(url) {
+                      if (!url) return url;
+                      if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+
+                      let absoluteUrl = url;
+                      if (url.startsWith('//')) {
+                        absoluteUrl = 'https:' + url;
+                      } else if (url.startsWith('/')) {
+                        absoluteUrl = BASE_URL + url;
+                      } else if (!url.startsWith('http')) {
+                        absoluteUrl = BASE_URL + '/' + url;
+                      }
+
+                      if (absoluteUrl.includes(PROXY_URL)) return absoluteUrl;
+
+                      return PROXY_URL + '?url=' + encodeURIComponent(absoluteUrl) + '&referer=' + encodeURIComponent(ORIGINAL_REFERER);
                     }
-                    return window.__originalFetch(url, options);
-                  };
-                </script>`
-              );
+
+                    const originalFetch = window.fetch;
+                    window.fetch = function(input, init) {
+                      let url = input;
+                      if (typeof input === 'string') {
+                        url = rewriteUrl(input);
+                      } else if (input instanceof Request) {
+                        url = rewriteUrl(input.url);
+                      }
+                      return originalFetch(url, init);
+                    };
+
+                    const originalOpen = XMLHttpRequest.prototype.open;
+                    XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+                      const newUrl = rewriteUrl(url);
+                      return originalOpen.apply(this, [method, newUrl, async, user, password]);
+                    };
+
+                    Object.defineProperty(document, 'referrer', { get: () => ORIGINAL_REFERER });
+                  })();
+                </script>
+                <base href="${baseUrl}/">
+              `;
+
+              if (html.includes('<head')) {
+                html = html.replace('<head>', '<head>' + interceptorScript);
+              } else {
+                html = interceptorScript + html;
+              }
               
               html = html.replace(/src=["']\/\//g, 'src="https://');
               html = html.replace(/href=["']\/\//g, 'href="https://');
-              
-              html = html.replace(/src=["'](?!https?:\/\/|data:|\/api)\/([^"']+)["']/g, `src="${baseUrl}/$1"`);
-              html = html.replace(/href=["'](?!https?:\/\/|data:|#|javascript:)\/([^"']+)["']/g, `href="${baseUrl}/$1"`);
               
               res.setHeader('Content-Type', 'text/html; charset=utf-8');
               res.end(html);
@@ -132,8 +153,6 @@ function scraperPlugin() {
               }
               res.end(response.data);
             }
-            
-            console.log(`[VideoProxy] Successfully proxied: ${targetUrl}`);
           } catch (error) {
             console.error('[VideoProxy] Error:', error.message);
             res.statusCode = 500;

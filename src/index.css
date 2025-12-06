@@ -2006,11 +2006,19 @@ iframe.focusable:focus {
 }
 
 @media (max-width: 768px) {
-  /* On mobile, maybe hide them because swipe is better?
-     Or keep them small. Let's keep them but maybe always visible or relying on user tapping.
-     Actually, standard UX for horizontal scroll on mobile is just swipe.
-     Buttons might obstruct view. */
   .scroll-btn {
-    display: none;
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+    background: rgba(255, 255, 255, 0.15);
+    opacity: 1 !important; /* Always visible on mobile */
+  }
+
+  .scroll-btn.left {
+    left: 4px;
+  }
+
+  .scroll-btn.right {
+    right: 4px;
   }
 }
