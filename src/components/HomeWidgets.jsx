@@ -103,12 +103,35 @@ export const HeroCarousel = memo(({ movies, onPlay, onDetails }) => {
 });
 
 export const Row = memo(({ title, data, onSelect, onLoadMore, isLoadingMore, hasMore = true, layout = 'portrait' }) => {
+    const scrollRef = React.useRef(null);
+
+    const handleScroll = (direction) => {
+        if (scrollRef.current) {
+            const { current } = scrollRef;
+            const scrollAmount = window.innerWidth * 0.8;
+            current.scrollBy({
+                left: direction === 'left' ? -scrollAmount : scrollAmount,
+                behavior: 'smooth'
+            });
+        }
+    };
+
     if (!data || data.length === 0) return <SkeletonRow />;
     
     return (
-        <div className="row-wrapper">
+        <div className="row-wrapper" style={{ position: 'relative' }}>
             <h3 className="row-header">{title}</h3>
-            <div className="row-scroll-container">
+
+            <button
+                className="scroll-btn left"
+                onClick={() => handleScroll('left')}
+                tabIndex="-1"
+                aria-label="Sola kaydır"
+            >
+                <i className="fas fa-chevron-left"></i>
+            </button>
+
+            <div className="row-scroll-container" ref={scrollRef}>
                 {data.map((m, i) => (
                     <Card 
                         key={`${m.id}-${i}`} 
@@ -141,6 +164,15 @@ export const Row = memo(({ title, data, onSelect, onLoadMore, isLoadingMore, has
                     </button>
                 )}
             </div>
+
+            <button
+                className="scroll-btn right"
+                onClick={() => handleScroll('right')}
+                tabIndex="-1"
+                aria-label="Sağa kaydır"
+            >
+                <i className="fas fa-chevron-right"></i>
+            </button>
         </div>
     );
 });

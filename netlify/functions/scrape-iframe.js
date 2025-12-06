@@ -2,15 +2,21 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 
 const headers = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
   'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Accept-Encoding': 'gzip, deflate, br, zstd',
   'Connection': 'keep-alive',
   'Upgrade-Insecure-Requests': '1',
   'Sec-Fetch-Dest': 'document',
   'Sec-Fetch-Mode': 'navigate',
-  'Sec-Fetch-Site': 'none',
-  'Cache-Control': 'max-age=0'
+  'Sec-Fetch-Site': 'same-origin',
+  'Sec-Fetch-User': '?1',
+  'Sec-Ch-Ua': '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': '"Windows"',
+  'Cache-Control': 'max-age=0',
+  'Dnt': '1'
 };
 
 const normalizeTitle = (t) => t.toLowerCase()
@@ -26,6 +32,16 @@ const normalizeUrl = (src) => {
   if (!url.includes('?')) url += '?ap=1';
   else if (!url.includes('ap=')) url += '&ap=1';
   return url;
+};
+
+const createSlug = (text) => {
+    if (!text) return "";
+    const trMap = { 'ç': 'c', 'ğ': 'g', 'ş': 's', 'ü': 'u', 'ı': 'i', 'ö': 'o', 'Ç': 'c', 'Ğ': 'g', 'Ş': 's', 'Ü': 'u', 'İ': 'i', 'Ö': 'o' };
+    return text.split('').map(char => trMap[char] || char).join('')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '') // Harf rakam dışını sil
+        .replace(/\s+/g, '-')         // Boşlukları tire yap
+        .replace(/-+/g, '-');         // Çift tireleri düzelt
 };
 
 const searchWithQuery = async (query) => {
@@ -126,7 +142,112 @@ exports.handler = async (event) => {
     let iframeSrc = null;
     let moviePageUrl = null;
 
-    if (site === 'hdfilmizle') {
+    if (site === 'yabancidizibox') {
+      console.log(`[YabanciDiziBox] Searching for: "${title}" / "${originalTitle}" (slug: ${slug})`);
+
+      const isTvSeries = season && episode;
+      const searchUrl = `https://yabancidizibox.com/?s=${encodeURIComponent(title)}`;
+
+      try {
+        const searchResponse = await axios.get(searchUrl, {
+          headers: { ...headers, Referer: 'https://yabancidizibox.com/' },
+          timeout: 10000
+        });
+
+        let contentUrl = null;
+        if (searchResponse.status === 200) {
+          const $ = cheerio.load(searchResponse.data);
+          // Look for search results
+          const results = [];
+          $('.result-item, .poster, .movie, article').each((i, el) => {
+            const $el = $(el);
+            const link = $el.find('a').attr('href');
+            const resultTitle = $el.text().toLowerCase();
+            if (link) {
+              results.push({ link, title: resultTitle });
+            }
+          });
+
+          // Try to find exact match
+          const normalizedTitle = normalizeTitle(title);
+          const bestMatch = results.find(r => normalizeTitle(r.title).includes(normalizedTitle));
+
+          if (bestMatch) {
+            contentUrl = bestMatch.link;
+          }
+        }
+
+        // If not found in search, try direct URL patterns
+        if (!contentUrl) {
+            // YabancıDiziBox URL structure guesses
+            // Example: https://yabancidizibox.com/dizi/breaking-bad
+            // Example: https://yabancidizibox.com/film/the-matrix
+            const baseSlug = createSlug ? createSlug(originalTitle || title) : slug;
+            if (isTvSeries) {
+                contentUrl = `https://yabancidizibox.com/dizi/${baseSlug}`;
+            } else {
+                contentUrl = `https://yabancidizibox.com/film/${baseSlug}`;
+            }
+        }
+
+        // Handle TV Series specific episode page
+        if (contentUrl && isTvSeries) {
+             // For series, we might need to navigate to the episode page
+             // structure might be: /dizi/breaking-bad/sezon-1-bolum-1
+             if (!contentUrl.includes('sezon-') && !contentUrl.includes('bolum-')) {
+                 const cleanUrl = contentUrl.endsWith('/') ? contentUrl.slice(0, -1) : contentUrl;
+                 contentUrl = `${cleanUrl}/sezon-${season}-bolum-${episode}`;
+             }
+        }
+
+        console.log(`[YabanciDiziBox] Fetching content from: ${contentUrl}`);
+
+        const contentResponse = await axios.get(contentUrl, {
+            headers: { ...headers, Referer: 'https://yabancidizibox.com/' },
+            timeout: 10000,
+            validateStatus: (status) => status < 500
+        });
+
+        if (contentResponse.status === 200) {
+            moviePageUrl = contentUrl;
+            const html = contentResponse.data;
+            const $ = cheerio.load(html);
+
+            // Look for iframe
+            $('iframe').each((i, el) => {
+                if (iframeSrc) return;
+                const src = $(el).attr('src') || $(el).attr('data-src');
+                if (src && !src.includes('facebook') && !src.includes('google')) {
+                    iframeSrc = normalizeUrl(src);
+                    console.log(`[YabanciDiziBox] Found iframe: ${iframeSrc}`);
+                }
+            });
+
+            // Look for player variables in script
+            if (!iframeSrc) {
+                 // Check for vidmody/vidmoly direct links
+                 const vidmodyMatch = html.match(/https?:\/\/(?:player\.)?(?:vidmody\.com|vidmoly\.to)\/[a-zA-Z0-9_]+/);
+                 if (vidmodyMatch) {
+                     iframeSrc = normalizeUrl(vidmodyMatch[0]);
+                     console.log(`[YabanciDiziBox] Found vidmody url: ${iframeSrc}`);
+                 }
+
+                 if (!iframeSrc) {
+                     // Common patterns for players
+                     const match = html.match(/(?:source|src|file|video_url|url)["']?\s*:\s*["']([^"']+)["']/i);
+                     if (match && (match[1].includes('vidmody') || match[1].includes('vidmoly') || match[1].includes('embed'))) {
+                         iframeSrc = normalizeUrl(match[1]);
+                         console.log(`[YabanciDiziBox] Found source in script: ${iframeSrc}`);
+                     }
+                 }
+            }
+        }
+
+      } catch (e) {
+         console.log(`[YabanciDiziBox] Error: ${e.message}`);
+      }
+
+    } else if (site === 'hdfilmizle') {
       const isTvSeries = season && episode;
       
       console.log(`[HDFilmizle] Searching for: "${title}" / "${originalTitle}" (slug: ${slug})`);

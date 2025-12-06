@@ -13,6 +13,14 @@ exports.handler = async (event) => {
 
   const params = event.queryStringParameters || {};
   const targetUrl = params.url;
+  const targetReferer = params.referer || 'https://www.hdfilmizle.life/';
+  const targetOrigin = params.origin || (targetReferer ? new URL(targetReferer).origin : 'https://www.hdfilmizle.life');
+
+  // Extract domain from referer for document.domain mocking
+  let targetDomain = 'hdfilmizle.life';
+  try {
+      targetDomain = new URL(targetReferer).hostname.replace('www.', '');
+  } catch (e) {}
 
   if (!targetUrl) {
     return {
@@ -24,30 +32,28 @@ exports.handler = async (event) => {
 
   try {
     const parsedUrl = new URL(targetUrl);
-    const hdfilmizleReferer = 'https://www.hdfilmizle.life/';
-    const hdfilmizleOrigin = 'https://www.hdfilmizle.life';
 
     const proxyHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
       'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-      'Accept-Encoding': 'gzip, deflate, br',
       'Connection': 'keep-alive',
       'Upgrade-Insecure-Requests': '1',
       'Sec-Fetch-Dest': 'iframe',
       'Sec-Fetch-Mode': 'navigate',
       'Sec-Fetch-Site': 'cross-site',
       'Sec-Fetch-User': '?1',
-      'Sec-CH-UA': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
-      'Sec-CH-UA-Mobile': '?0',
-      'Sec-CH-UA-Platform': '"Windows"',
-      'Referer': hdfilmizleReferer,
-      'Origin': hdfilmizleOrigin,
+      'Sec-Ch-Ua': '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
+      'Sec-Ch-Ua-Mobile': '?0',
+      'Sec-Ch-Ua-Platform': '"Windows"',
+      'Referer': targetReferer,
+      'Origin': targetOrigin,
       'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache'
+      'Pragma': 'no-cache',
+      'Dnt': '1'
     };
 
-    console.log(`[VideoProxy] Fetching: ${targetUrl}`);
+    console.log(`[VideoProxy] Fetching: ${targetUrl} (Referer: ${targetReferer})`);
 
     const response = await axios.get(targetUrl, {
       headers: proxyHeaders,
@@ -69,20 +75,20 @@ exports.handler = async (event) => {
         html = html.replace(/<head([^>]*)>/i, `<head$1><base href="${baseUrl}/">`);
       }
       
-      html = html.replace(/document\.referrer/g, `"${hdfilmizleReferer}"`);
-      html = html.replace(/window\.location\.ancestorOrigins/g, `["${hdfilmizleOrigin}"]`);
-      html = html.replace(/parent\.location/g, `{href:"${hdfilmizleReferer}",origin:"${hdfilmizleOrigin}"}`);
-      html = html.replace(/top\.location/g, `{href:"${hdfilmizleReferer}",origin:"${hdfilmizleOrigin}"}`);
+      html = html.replace(/document\.referrer/g, `"${targetReferer}"`);
+      html = html.replace(/window\.location\.ancestorOrigins/g, `["${targetOrigin}"]`);
+      html = html.replace(/parent\.location/g, `{href:"${targetReferer}",origin:"${targetOrigin}"}`);
+      html = html.replace(/top\.location/g, `{href:"${targetReferer}",origin:"${targetOrigin}"}`);
       
       html = html.replace(
         /<head([^>]*)>/i,
         `<head$1>
         <script>
           Object.defineProperty(document, 'referrer', {
-            get: function() { return '${hdfilmizleReferer}'; }
+            get: function() { return '${targetReferer}'; }
           });
           Object.defineProperty(document, 'domain', {
-            get: function() { return 'hdfilmizle.life'; },
+            get: function() { return '${targetDomain}'; },
             set: function() {}
           });
           window.__originalFetch = window.fetch;
