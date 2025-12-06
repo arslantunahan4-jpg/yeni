@@ -448,7 +448,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     }, [movie, isSeries, initialSeason, initialEpisode, scrapedUrls]);
 
     useEffect(() => {
-        if (source === 'hdfilmizle') {
+        if (source === 'hdfilmizle' || source === 'yabancidizibox') {
             if (!scrapedUrls[source]) {
                 scrapeIframeUrl(source);
             }
@@ -456,7 +456,8 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     }, [source, scrapeIframeUrl, scrapedUrls]);
 
     const SOURCES = [
-        { id: 'hdfilmizle', name: '🇹🇷 Türkçe' },
+        { id: 'yabancidizibox', name: '🇹🇷 TR Dublaj' },
+        { id: 'hdfilmizle', name: '🇹🇷 TR Altyazı' },
         { id: 'multiembed', name: 'MultiEmbed' },
         { id: 'vidsrc.cc', name: 'VidSrc CC' }, 
         { id: 'vsrc.su', name: 'VSrc SU' }, 
@@ -465,11 +466,11 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     ];
     
     const getUrl = useCallback(() => {
-        if (source === 'hdfilmizle' && scrapedUrls.hdfilmizle) {
+        if ((source === 'hdfilmizle' || source === 'yabancidizibox') && scrapedUrls[source]) {
             if (isNativePlatform()) {
-                return scrapedUrls.hdfilmizle;
+                return scrapedUrls[source];
             }
-            return `/api/video-proxy?url=${encodeURIComponent(scrapedUrls.hdfilmizle)}`;
+            return `/api/video-proxy?url=${encodeURIComponent(scrapedUrls[source])}`;
         }
 
         if (source === 'multiembed') {
@@ -491,8 +492,8 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     }, [source, isSeries, movie.id, initialSeason, initialEpisode, scrapedUrls]);
 
     const getDirectUrl = useCallback(() => {
-        if (source === 'hdfilmizle' && scrapedUrls.hdfilmizle) {
-            return scrapedUrls.hdfilmizle;
+        if ((source === 'hdfilmizle' || source === 'yabancidizibox') && scrapedUrls[source]) {
+            return scrapedUrls[source];
         }
         return null;
     }, [source, scrapedUrls]);
@@ -571,6 +572,11 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
                                     color: '#fff', 
                                     fontWeight: '700',
                                     boxShadow: '0 0 15px rgba(233, 30, 99, 0.4)'
+                                } : s.id === 'yabancidizibox' ? {
+                                    background: 'linear-gradient(135deg, #FF512F 0%, #DD2476 100%)',
+                                    color: '#fff',
+                                    fontWeight: '700',
+                                    boxShadow: '0 0 15px rgba(255, 81, 47, 0.4)'
                                 } : {}}
                             >
                                 {s.name}
@@ -615,7 +621,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
                         title="Video Player"
                         onError={() => setIframeError(true)}
                     />
-                    {source === 'hdfilmizle' && getDirectUrl() && (
+                    {(source === 'hdfilmizle' || source === 'yabancidizibox') && getDirectUrl() && (
                         <div style={{
                             position: 'absolute',
                             bottom: '100px',
@@ -671,7 +677,7 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
                     <i className="fas fa-exclamation-triangle" style={{ fontSize: '48px', marginBottom: '16px', color: '#ff6b6b' }}></i>
                     <p style={{ fontSize: '16px', opacity: 0.8 }}>Bu kaynak için video bulunamadı</p>
                     <p style={{ fontSize: '14px', opacity: 0.5, marginTop: '8px' }}>Lütfen başka bir kaynak deneyin</p>
-                    {source === 'hdfilmizle' && getDirectUrl() && (
+                    {(source === 'hdfilmizle' || source === 'yabancidizibox') && getDirectUrl() && (
                         <button
                             onClick={openInNewWindow}
                             className="focusable"
