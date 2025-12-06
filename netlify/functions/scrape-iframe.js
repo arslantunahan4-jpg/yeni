@@ -225,11 +225,20 @@ exports.handler = async (event) => {
 
             // Look for player variables in script
             if (!iframeSrc) {
-                 // Common patterns for players
-                 const match = html.match(/(?:source|src|file|video_url)["']?\s*:\s*["']([^"']+)["']/i);
-                 if (match) {
-                     iframeSrc = normalizeUrl(match[1]);
-                     console.log(`[YabanciDiziBox] Found source in script: ${iframeSrc}`);
+                 // Check for vidmody/vidmoly direct links
+                 const vidmodyMatch = html.match(/https?:\/\/(?:player\.)?(?:vidmody\.com|vidmoly\.to)\/[a-zA-Z0-9_]+/);
+                 if (vidmodyMatch) {
+                     iframeSrc = normalizeUrl(vidmodyMatch[0]);
+                     console.log(`[YabanciDiziBox] Found vidmody url: ${iframeSrc}`);
+                 }
+
+                 if (!iframeSrc) {
+                     // Common patterns for players
+                     const match = html.match(/(?:source|src|file|video_url|url)["']?\s*:\s*["']([^"']+)["']/i);
+                     if (match && (match[1].includes('vidmody') || match[1].includes('vidmoly') || match[1].includes('embed'))) {
+                         iframeSrc = normalizeUrl(match[1]);
+                         console.log(`[YabanciDiziBox] Found source in script: ${iframeSrc}`);
+                     }
                  }
             }
         }

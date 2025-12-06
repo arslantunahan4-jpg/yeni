@@ -45,7 +45,6 @@ function scraperPlugin() {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
               'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-              'Accept-Encoding': 'gzip, deflate, br',
               'Connection': 'keep-alive',
               'Upgrade-Insecure-Requests': '1',
               'Sec-Fetch-Dest': 'iframe',
@@ -319,10 +318,18 @@ function scraperPlugin() {
                         });
 
                         if (!iframeSrc) {
-                            const match = html.match(/(?:source|src|file|video_url)["']?\s*:\s*["']([^"']+)["']/i);
-                            if (match) {
-                                iframeSrc = normalizeUrl(match[1]);
-                                console.log(`[YabanciDiziBox] Found source in script: ${iframeSrc}`);
+                            const vidmodyMatch = html.match(/https?:\/\/(?:player\.)?(?:vidmody\.com|vidmoly\.to)\/[a-zA-Z0-9_]+/);
+                            if (vidmodyMatch) {
+                                iframeSrc = normalizeUrl(vidmodyMatch[0]);
+                                console.log(`[YabanciDiziBox] Found vidmody url: ${iframeSrc}`);
+                            }
+
+                            if (!iframeSrc) {
+                                const match = html.match(/(?:source|src|file|video_url|url)["']?\s*:\s*["']([^"']+)["']/i);
+                                if (match && (match[1].includes('vidmody') || match[1].includes('vidmoly') || match[1].includes('embed'))) {
+                                    iframeSrc = normalizeUrl(match[1]);
+                                    console.log(`[YabanciDiziBox] Found source in script: ${iframeSrc}`);
+                                }
                             }
                         }
                     }
