@@ -174,10 +174,11 @@ exports.handler = async (event) => {
               ...headers,
               'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
               'Referer': 'https://www.hdfilmizle.life/',
+              'Origin': 'https://www.hdfilmizle.life',
               'X-Requested-With': 'XMLHttpRequest'
             },
             timeout: 10000,
-            validateStatus: (status) => status === 200
+            validateStatus: (status) => true // Accept all to debug
           });
 
           if (searchResponse.status === 200 && Array.isArray(searchResponse.data)) {
@@ -193,7 +194,7 @@ exports.handler = async (event) => {
             console.log(`[HDFilmizle] Found ${results.length} results via POST search.`);
             return results;
           } else {
-             console.log(`[HDFilmizle] POST Search failed or invalid format.`);
+             console.log(`[HDFilmizle] POST Search failed. Status: ${searchResponse.status}. Data type: ${typeof searchResponse.data}`);
           }
         } catch (e) {
           console.log(`[HDFilmizle] Search error for "${query}":`, e.message);
@@ -251,15 +252,17 @@ exports.handler = async (event) => {
             const resp = await axios.get(tryUrl, {
               headers: { ...headers, Referer: 'https://www.hdfilmizle.life/' },
               timeout: 5000,
-              validateStatus: (status) => status < 400
+              validateStatus: (status) => status < 500
             });
             if (resp.status === 200) {
               contentUrl = tryUrl;
               console.log(`[HDFilmizle] Direct URL valid: ${contentUrl}`);
               break;
+            } else {
+              console.log(`[HDFilmizle] Direct URL failed: ${tryUrl} (Status: ${resp.status})`);
             }
           } catch (e) {
-            // ignore 404s
+            console.log(`[HDFilmizle] Direct URL error: ${tryUrl} (${e.message})`);
           }
         }
       }
