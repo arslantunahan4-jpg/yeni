@@ -22,6 +22,14 @@ export const HeroCarousel = memo(({ movies, onPlay, onDetails }) => {
     
     const movie = movies[index];
 
+    const prevSlide = () => {
+        setIndex(prev => (prev === 0 ? movies.length - 1 : prev - 1));
+    };
+
+    const nextSlide = () => {
+        setIndex(prev => (prev + 1) % movies.length);
+    };
+
     return (
         <div className="hero-section">
             <AnimatePresence mode="wait">
@@ -71,6 +79,24 @@ export const HeroCarousel = memo(({ movies, onPlay, onDetails }) => {
                     </div>
                 </motion.div>
             </div>
+
+            <button
+                className="scroll-btn left"
+                onClick={prevSlide}
+                style={{ left: '1rem', zIndex: 40 }}
+                aria-label="Önceki"
+            >
+                <i className="fas fa-chevron-left"></i>
+            </button>
+
+            <button
+                className="scroll-btn right"
+                onClick={nextSlide}
+                style={{ right: '1rem', zIndex: 40 }}
+                aria-label="Sonraki"
+            >
+                <i className="fas fa-chevron-right"></i>
+            </button>
             
             <div style={{
                 position: 'absolute',

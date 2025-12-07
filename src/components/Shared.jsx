@@ -80,6 +80,8 @@ export const SmartImage = memo(({ src, alt, style, className }) => {
                 <img
                     src={src}
                     alt={alt}
+                    loading="lazy"
+                    decoding="async"
                     onLoad={handleLoad}
                     onError={() => setError(true)}
                     style={{
