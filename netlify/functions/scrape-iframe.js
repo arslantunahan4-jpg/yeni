@@ -161,45 +161,39 @@ exports.handler = async (event) => {
         .replace(/[^a-z0-9]/g, '');
 
       const searchWithQuery = async (query) => {
-        const searchUrl = `https://www.hdfilmizle.life/?s=${encodeURIComponent(query)}`;
-        console.log(`[HDFilmizle] Requesting Search URL: ${searchUrl}`);
+        const searchUrl = 'https://www.hdfilmizle.life/search/';
+        console.log(`[HDFilmizle] POST Search: ${query}`);
 
         try {
-          const searchResponse = await axios.get(searchUrl, {
-            headers: { ...headers, Referer: 'https://www.hdfilmizle.life/' },
-            timeout: 15000,
-            validateStatus: (status) => true // Accept all status to debug
+          // Use POST /search/ with x-www-form-urlencoded
+          const params = new URLSearchParams();
+          params.append('query', query);
+
+          const searchResponse = await axios.post(searchUrl, params.toString(), {
+            headers: {
+              ...headers,
+              'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+              'Referer': 'https://www.hdfilmizle.life/',
+              'X-Requested-With': 'XMLHttpRequest'
+            },
+            timeout: 10000,
+            validateStatus: (status) => status === 200
           });
 
-          console.log(`[HDFilmizle] Search Response Status: ${searchResponse.status}`);
-
-          if (searchResponse.status === 200) {
-            const html = searchResponse.data;
-            // Basic check if we got a real page or a block/captcha
-            if (html.length < 500) {
-                 console.log(`[HDFilmizle] Search response too short (${html.length} chars). Content: ${html}`);
-            }
-
-            const $ = cheerio.load(html);
-            const results = [];
-
-            $('article, .movie-item, .film-item, .poster, .movie, a[href*="hdfilmizle.life"]').each((i, el) => {
-              const $el = $(el);
-              let link = $el.find('a').first().attr('href') || $el.attr('href');
-              let resultTitle = $el.find('.title, h2, h3, .movie-title, .film-title').first().text().trim()
-                                || $el.find('a').first().attr('title')
-                                || $el.find('img').first().attr('alt')
-                                || '';
-
-              if (link && link.includes('hdfilmizle.life') && !link.includes('?s=') && resultTitle) {
-                results.push({ link, title: resultTitle });
-              }
+          if (searchResponse.status === 200 && Array.isArray(searchResponse.data)) {
+            const data = searchResponse.data;
+            const results = data.map(item => {
+                return {
+                    link: `https://www.hdfilmizle.life/${item.slug}`,
+                    title: item.name,
+                    year: item.year
+                };
             });
 
-            console.log(`[HDFilmizle] Parsed ${results.length} results from search page.`);
+            console.log(`[HDFilmizle] Found ${results.length} results via POST search.`);
             return results;
           } else {
-             console.log(`[HDFilmizle] Search failed with status ${searchResponse.status}`);
+             console.log(`[HDFilmizle] POST Search failed or invalid format.`);
           }
         } catch (e) {
           console.log(`[HDFilmizle] Search error for "${query}":`, e.message);
