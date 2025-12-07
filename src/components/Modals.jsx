@@ -467,7 +467,9 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     
     const getUrl = useCallback(() => {
         if (source === 'yabancidizibox' && scrapedUrls[source]) {
-            return scrapedUrls[source];
+            const targetUrl = scrapedUrls[source];
+            const referer = 'https://yabancidizibox.com/';
+            return `/api/video-proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(referer)}`;
         }
 
         if (source === 'hdfilmizle' && scrapedUrls[source]) {
