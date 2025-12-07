@@ -466,12 +466,18 @@ export const Player = ({ movie, onClose, initialSeason, initialEpisode }) => {
     ];
     
     const getUrl = useCallback(() => {
-        if ((source === 'hdfilmizle' || source === 'yabancidizibox') && scrapedUrls[source]) {
+        if (source === 'yabancidizibox' && scrapedUrls[source]) {
+            const targetUrl = scrapedUrls[source];
+            const referer = 'https://yabancidizibox.com/';
+            return `/api/video-proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(referer)}`;
+        }
+
+        if (source === 'hdfilmizle' && scrapedUrls[source]) {
             if (isNativePlatform()) {
                 return scrapedUrls[source];
             }
             const targetUrl = scrapedUrls[source];
-            const referer = source === 'yabancidizibox' ? 'https://yabancidizibox.com/' : 'https://www.hdfilmizle.life/';
+            const referer = 'https://www.hdfilmizle.life/';
             return `/api/video-proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(referer)}`;
         }
 
