@@ -17,7 +17,7 @@ exports.handler = async (event) => {
   // Dynamic Referer Handling
   let targetReferer = params.referer;
   if (!targetReferer) {
-      if (targetUrl && targetUrl.includes('vidmody')) {
+      if (targetUrl && (targetUrl.includes('vidmody') || targetUrl.includes('vidmoly'))) {
           targetReferer = 'https://yabancidizibox.com/';
       } else {
           targetReferer = 'https://www.hdfilmizle.life/';
@@ -78,6 +78,45 @@ exports.handler = async (event) => {
     if (contentType.includes('text/html')) {
       let html = response.data.toString('utf-8');
       
+      const PROXY_ENDPOINT = '/api/video-proxy';
+
+      // Helper to generate proxy URL
+      // We encode the URL and Referer to pass them to the proxy recursively
+      // We use the *current* targetUrl as the referer for sub-resources
+      const makeProxyUrl = (url) => {
+          if (!url) return '';
+          if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('magnet:')) return url;
+
+          let absoluteUrl = url;
+          if (url.startsWith('//')) {
+            absoluteUrl = 'https:' + url;
+          } else if (url.startsWith('/')) {
+            // Handle root-relative
+             absoluteUrl = new URL(url, baseUrl).href;
+          } else if (!url.startsWith('http')) {
+            // Handle path-relative
+             absoluteUrl = new URL(url, targetUrl).href;
+          }
+
+          return `${PROXY_ENDPOINT}?url=${encodeURIComponent(absoluteUrl)}&referer=${encodeURIComponent(targetUrl)}`;
+      };
+
+      // Aggressive HTML Rewriting
+      // 1. Rewrite <script src="...">
+      html = html.replace(/<script([^>]*)src=["']([^"']+)["']([^>]*)>/gi, (match, p1, src, p3) => {
+          return `<script${p1}src="${makeProxyUrl(src)}"${p3}>`;
+      });
+
+      // 2. Rewrite <link href="..."> (CSS)
+      html = html.replace(/<link([^>]*)href=["']([^"']+)["']([^>]*)>/gi, (match, p1, href, p3) => {
+          return `<link${p1}href="${makeProxyUrl(href)}"${p3}>`;
+      });
+
+      // 3. Rewrite <iframe src="...">
+      html = html.replace(/<iframe([^>]*)src=["']([^"']+)["']([^>]*)>/gi, (match, p1, src, p3) => {
+           return `<iframe${p1}src="${makeProxyUrl(src)}"${p3}>`;
+      });
+
       // Inject Interceptor Script
       // This script intercepts Fetch/XHR to rewrite URLs to point to this proxy
       // It also mocks document.referrer
@@ -87,6 +126,7 @@ exports.handler = async (event) => {
             const PROXY_URL = '/api/video-proxy';
             const ORIGINAL_REFERER = '${targetReferer}';
             const BASE_URL = '${baseUrl}';
+            const CURRENT_PAGE_URL = '${targetUrl}';
 
             console.log('[ProxyScript] Initialized for', BASE_URL);
 
@@ -95,20 +135,22 @@ exports.handler = async (event) => {
               if (url.startsWith('data:') || url.startsWith('blob:')) return url;
 
               let absoluteUrl = url;
-              if (url.startsWith('//')) {
-                absoluteUrl = 'https:' + url;
-              } else if (url.startsWith('/')) {
-                absoluteUrl = BASE_URL + url;
-              } else if (!url.startsWith('http')) {
-                absoluteUrl = BASE_URL + '/' + url;
+              try {
+                  if (url.startsWith('//')) {
+                    absoluteUrl = 'https:' + url;
+                  } else if (url.startsWith('/')) {
+                    absoluteUrl = new URL(url, BASE_URL).href;
+                  } else if (!url.startsWith('http')) {
+                    absoluteUrl = new URL(url, CURRENT_PAGE_URL).href;
+                  }
+              } catch(e) {
+                  return url;
               }
 
               if (absoluteUrl.includes(PROXY_URL)) return absoluteUrl;
 
-              // The magic: Recursively proxy sub-requests
-              // Referer for sub-requests should be the current page's base url (the video host)
-              // because players check if the m3u8 request comes from their own domain.
-              return PROXY_URL + '?url=' + encodeURIComponent(absoluteUrl) + '&referer=' + encodeURIComponent(BASE_URL);
+              // Recursive proxying
+              return PROXY_URL + '?url=' + encodeURIComponent(absoluteUrl) + '&referer=' + encodeURIComponent(CURRENT_PAGE_URL);
             }
 
             const originalFetch = window.fetch;
@@ -139,10 +181,6 @@ exports.handler = async (event) => {
       } else {
         html = interceptorScript + html;
       }
-      
-      // Rewrite basic src/href to HTTPS to avoid mixed content warnings if they were protocol relative
-      html = html.replace(/src=["']\/\//g, 'src="https://');
-      html = html.replace(/href=["']\/\//g, 'href="https://');
 
       return {
         statusCode: 200,
