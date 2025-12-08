@@ -168,18 +168,13 @@ exports.handler = async (event) => {
           const searchResponse = await axios.get(searchUrl, {
             headers: { ...headers, Referer: 'https://www.hdfilmizle.life/' },
             timeout: 15000,
-            validateStatus: (status) => true // Accept all status to debug
+            validateStatus: (status) => status < 500
           });
 
-          console.log(`[HDFilmizle] Search Response Status: ${searchResponse.status}`);
-
-          if (searchResponse.status === 200) {
+          // NOTE: hdfilmizle sometimes returns 404 for search results even if content exists (weird server config)
+          // We process the body regardless of 404 if it looks like a page
+          if (searchResponse.status === 200 || searchResponse.status === 404) {
             const html = searchResponse.data;
-            // Basic check if we got a real page or a block/captcha
-            if (html.length < 500) {
-                 console.log(`[HDFilmizle] Search response too short (${html.length} chars). Content: ${html}`);
-            }
-
             const $ = cheerio.load(html);
             const results = [];
 
@@ -196,7 +191,7 @@ exports.handler = async (event) => {
               }
             });
 
-            console.log(`[HDFilmizle] Parsed ${results.length} results from search page.`);
+            console.log(`[HDFilmizle] Parsed ${results.length} results from search page (Status: ${searchResponse.status}).`);
             return results;
           } else {
              console.log(`[HDFilmizle] Search failed with status ${searchResponse.status}`);
@@ -257,15 +252,16 @@ exports.handler = async (event) => {
             const resp = await axios.get(tryUrl, {
               headers: { ...headers, Referer: 'https://www.hdfilmizle.life/' },
               timeout: 5000,
-              validateStatus: (status) => status < 400
+              validateStatus: (status) => status < 500
             });
-            if (resp.status === 200) {
+            // Accept 404 if it contains iframe/player content (as seen in some cases)
+            if ((resp.status === 200 || resp.status === 404) && (resp.data.includes('iframe') || resp.data.includes('player') || resp.data.includes('parts'))) {
               contentUrl = tryUrl;
-              console.log(`[HDFilmizle] Direct URL valid: ${contentUrl}`);
+              console.log(`[HDFilmizle] Direct URL valid (Status ${resp.status}): ${contentUrl}`);
               break;
             }
           } catch (e) {
-            // ignore 404s
+            // ignore
           }
         }
       }
@@ -285,12 +281,16 @@ exports.handler = async (event) => {
           for (const epUrl of episodeVariations) {
             try {
               console.log(`[HDFilmizle] Checking episode URL: ${epUrl}`);
-              const epResponse = await axios.head(epUrl, {
+              const epResponse = await axios.get(epUrl, { // Changed HEAD to GET to check content
                  headers: { ...headers, Referer: contentUrl },
                  timeout: 5000,
-                 validateStatus: (status) => status < 400
+                 validateStatus: (status) => status < 500
               });
-              if (epResponse.status === 200) {
+              if (epResponse.status === 200 || epResponse.status === 404) {
+                  // Double check content if 404
+                  if (epResponse.status === 404 && !epResponse.data.includes('player') && !epResponse.data.includes('iframe')) {
+                      continue;
+                  }
                   episodeUrlFound = epUrl;
                   break;
               }
@@ -305,7 +305,8 @@ exports.handler = async (event) => {
         try {
           const response = await axios.get(contentUrl, {
             headers: { ...headers, Referer: 'https://www.hdfilmizle.life/' },
-            timeout: 15000
+            timeout: 15000,
+            validateStatus: (status) => status < 500
           });
           
           const html = response.data;
@@ -339,6 +340,19 @@ exports.handler = async (event) => {
               }
             });
           }
+
+          if (!iframeSrc) {
+            // Check for parts variable in scripts (common in this template)
+            const partsMatch = html.match(/let\s+parts\s*=\s*(\[[\s\S]*?\]);/);
+            if (partsMatch) {
+              const partsContent = partsMatch[1];
+              const vidrameSrcMatch = partsContent.match(/vidrame\.pro[^\s"'<>\]\\]*/i);
+              if (vidrameSrcMatch) {
+                 iframeSrc = normalizeUrl('https://' + vidrameSrcMatch[0].replace(/\\+/g, ''));
+                 console.log(`[HDFilmizle] Found in parts: ${iframeSrc}`);
+              }
+            }
+          }
           
         } catch (e) {
           console.log(`[HDFilmizle] Error fetching content page:`, e.message);
@@ -361,7 +375,7 @@ exports.handler = async (event) => {
     } else {
       console.log(`[Scraper] No iframe found.`);
       return {
-        statusCode: 404,
+        statusCode: 404, // Keep 404 for client to know it failed
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({ success: false, error: 'Iframe bulunamadı', moviePage: moviePageUrl })
       };

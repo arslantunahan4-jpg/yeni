@@ -4,7 +4,8 @@ exports.handler = async (event) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': '*'
+    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges'
   };
 
   if (event.httpMethod === 'OPTIONS') {
@@ -45,6 +46,7 @@ exports.handler = async (event) => {
     const parsedUrl = new URL(targetUrl);
     const baseUrl = `${parsedUrl.protocol}//${parsedUrl.host}`;
 
+    // Headers to send to the video provider
     const proxyHeaders = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -61,8 +63,14 @@ exports.handler = async (event) => {
       'Pragma': 'no-cache'
     };
 
+    // Forward Range header if present (Critical for video playback)
+    if (event.headers['range'] || event.headers['Range']) {
+      proxyHeaders['Range'] = event.headers['range'] || event.headers['Range'];
+    }
+
     console.log(`[VideoProxy] Fetching: ${targetUrl}`);
     console.log(`[VideoProxy] Using Referer: ${targetReferer}`);
+    if (proxyHeaders['Range']) console.log(`[VideoProxy] Forwarding Range: ${proxyHeaders['Range']}`);
 
     const response = await axios.get(targetUrl, {
       headers: proxyHeaders,
@@ -75,14 +83,13 @@ exports.handler = async (event) => {
     const contentType = response.headers['content-type'] || 'text/html';
     console.log(`[VideoProxy] Response Status: ${response.status}, Type: ${contentType}`);
 
+    // If text/html, we rewrite content
     if (contentType.includes('text/html')) {
       let html = response.data.toString('utf-8');
       
       const PROXY_ENDPOINT = '/api/video-proxy';
 
       // Helper to generate proxy URL
-      // We encode the URL and Referer to pass them to the proxy recursively
-      // We use the *current* targetUrl as the referer for sub-resources
       const makeProxyUrl = (url) => {
           if (!url) return '';
           if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('magnet:')) return url;
@@ -91,35 +98,25 @@ exports.handler = async (event) => {
           if (url.startsWith('//')) {
             absoluteUrl = 'https:' + url;
           } else if (url.startsWith('/')) {
-            // Handle root-relative
-             absoluteUrl = new URL(url, baseUrl).href;
+            absoluteUrl = new URL(url, baseUrl).href;
           } else if (!url.startsWith('http')) {
-            // Handle path-relative
              absoluteUrl = new URL(url, targetUrl).href;
           }
 
           return `${PROXY_ENDPOINT}?url=${encodeURIComponent(absoluteUrl)}&referer=${encodeURIComponent(targetUrl)}`;
       };
 
-      // Aggressive HTML Rewriting
-      // 1. Rewrite <script src="...">
+      // Rewrite src attributes
       html = html.replace(/<script([^>]*)src=["']([^"']+)["']([^>]*)>/gi, (match, p1, src, p3) => {
           return `<script${p1}src="${makeProxyUrl(src)}"${p3}>`;
       });
-
-      // 2. Rewrite <link href="..."> (CSS)
       html = html.replace(/<link([^>]*)href=["']([^"']+)["']([^>]*)>/gi, (match, p1, href, p3) => {
           return `<link${p1}href="${makeProxyUrl(href)}"${p3}>`;
       });
-
-      // 3. Rewrite <iframe src="...">
       html = html.replace(/<iframe([^>]*)src=["']([^"']+)["']([^>]*)>/gi, (match, p1, src, p3) => {
            return `<iframe${p1}src="${makeProxyUrl(src)}"${p3}>`;
       });
 
-      // Inject Interceptor Script
-      // This script intercepts Fetch/XHR to rewrite URLs to point to this proxy
-      // It also mocks document.referrer
       const interceptorScript = `
         <script>
           (function() {
@@ -127,8 +124,6 @@ exports.handler = async (event) => {
             const ORIGINAL_REFERER = '${targetReferer}';
             const BASE_URL = '${baseUrl}';
             const CURRENT_PAGE_URL = '${targetUrl}';
-
-            console.log('[ProxyScript] Initialized for', BASE_URL);
 
             function rewriteUrl(url) {
               if (!url) return url;
@@ -148,8 +143,6 @@ exports.handler = async (event) => {
               }
 
               if (absoluteUrl.includes(PROXY_URL)) return absoluteUrl;
-
-              // Recursive proxying
               return PROXY_URL + '?url=' + encodeURIComponent(absoluteUrl) + '&referer=' + encodeURIComponent(CURRENT_PAGE_URL);
             }
 
@@ -183,7 +176,7 @@ exports.handler = async (event) => {
       }
 
       return {
-        statusCode: 200,
+        statusCode: response.status,
         headers: {
           ...corsHeaders,
           'Content-Type': 'text/html; charset=utf-8'
@@ -192,12 +185,18 @@ exports.handler = async (event) => {
       };
     } else {
       // Return binary data (images, m3u8, ts segments, etc.)
+      const headers = {
+        ...corsHeaders,
+        'Content-Type': contentType
+      };
+
+      if (response.headers['content-length']) headers['Content-Length'] = response.headers['content-length'];
+      if (response.headers['content-range']) headers['Content-Range'] = response.headers['content-range'];
+      if (response.headers['accept-ranges']) headers['Accept-Ranges'] = response.headers['accept-ranges'];
+
       return {
-        statusCode: 200,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': contentType
-        },
+        statusCode: response.status,
+        headers: headers,
         body: response.data.toString('base64'),
         isBase64Encoded: true
       };

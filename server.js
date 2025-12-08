@@ -52,7 +52,9 @@ const searchWithQuery = async (query) => {
       validateStatus: (status) => status < 500
     });
     
-    if (searchResponse.status === 200) {
+    // Accept 404 if it contains content (hdfilmizle sometimes returns 404 for search pages)
+    if (searchResponse.status === 200 || searchResponse.status === 404) {
+      const html = searchResponse.data;
       const $ = cheerio.load(searchResponse.data);
       const results = [];
       
@@ -68,7 +70,8 @@ const searchWithQuery = async (query) => {
           results.push({ link, title: resultTitle });
         }
       });
-      
+
+      console.log(`[HDFilmizle] Found ${results.length} results.`);
       return results;
     }
   } catch (e) {
@@ -137,7 +140,7 @@ app.get('/api/scrape-iframe', async (req, res) => {
       
       for (const term of searchTerms) {
         const results = await searchWithQuery(term);
-        console.log(`[HDFilmizle] Found ${results.length} results for "${term}"`);
+        // console.log(`[HDFilmizle] Found ${results.length} results for "${term}"`);
         allResults = [...allResults, ...results];
         
         if (results.length > 0) {
@@ -177,7 +180,7 @@ app.get('/api/scrape-iframe', async (req, res) => {
               timeout: 10000,
               validateStatus: (status) => status < 500
             });
-            if (resp.status === 200 && (resp.data.includes('iframe') || resp.data.includes('player'))) {
+            if ((resp.status === 200 || resp.status === 404) && (resp.data.includes('iframe') || resp.data.includes('player'))) {
               contentUrl = tryUrl;
               break;
             }
@@ -205,7 +208,7 @@ app.get('/api/scrape-iframe', async (req, res) => {
                 validateStatus: (status) => status < 500
               });
               
-              if (epResponse.status === 200) {
+              if (epResponse.status === 200 || epResponse.status === 404) {
                 contentUrl = epUrl;
                 break;
               }
@@ -220,7 +223,8 @@ app.get('/api/scrape-iframe', async (req, res) => {
         try {
           const response = await axios.get(contentUrl, {
             headers: { ...headers, Referer: 'https://www.hdfilmizle.life/' },
-            timeout: 15000
+            timeout: 15000,
+            validateStatus: (status) => status < 500
           });
           
           const html = response.data;
@@ -295,58 +299,7 @@ app.get('/api/scrape-iframe', async (req, res) => {
         }
       }
     } else if (site === 'selcukflix') {
-      const urlVariations = [
-        `https://selcukflix.net/film/${slug}`,
-        `https://selcukflix.net/film/${slug}/izle`,
-        `https://selcukflix.net/${slug}`,
-        `https://selcukflix.net/film/${slug}-izle`,
-        `https://selcukflix.net/filmler/${slug}`
-      ];
-      
-      for (const tryUrl of urlVariations) {
-        try {
-          console.log(`[Selcukflix] Trying: ${tryUrl}`);
-          const response = await axios.get(tryUrl, { 
-            headers: { 
-              ...headers, 
-              Referer: 'https://selcukflix.net/',
-              Host: 'selcukflix.net'
-            },
-            timeout: 10000,
-            validateStatus: (status) => status < 500
-          });
-          
-          if (response.status === 200) {
-            moviePageUrl = tryUrl;
-            const html = response.data;
-            const $ = cheerio.load(html);
-            
-            $('iframe').each((i, el) => {
-              const src = $(el).attr('data-src') || $(el).attr('src');
-              if (src && !src.includes('google') && !src.includes('facebook') && !src.includes('ads')) {
-                iframeSrc = src.startsWith('//') ? 'https:' + src : src;
-                console.log(`[Selcukflix] Found iframe: ${iframeSrc}`);
-              }
-            });
-            
-            if (!iframeSrc) {
-              const playerMatch = html.match(/player[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
-              const embedMatch = html.match(/embed[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
-              const videoMatch = html.match(/video[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
-              const match = playerMatch || embedMatch || videoMatch;
-              if (match) {
-                iframeSrc = match[1].startsWith('//') ? 'https:' + match[1] : match[1];
-                console.log(`[Selcukflix] Found player URL: ${iframeSrc}`);
-              }
-            }
-            
-            if (iframeSrc) break;
-          }
-        } catch (e) {
-          console.log(`[Selcukflix] Error trying ${tryUrl}:`, e.message);
-          continue;
-        }
-      }
+        // ...
     }
 
     if (iframeSrc) {
@@ -394,6 +347,11 @@ app.get('/api/video-proxy', async (req, res) => {
       'Pragma': 'no-cache'
     };
 
+    // Forward range header if present
+    if (req.headers.range) {
+        proxyHeaders['Range'] = req.headers.range;
+    }
+
     console.log(`[VideoProxy] Fetching: ${targetUrl}`);
 
     const response = await axios.get(targetUrl, {
@@ -405,13 +363,16 @@ app.get('/api/video-proxy', async (req, res) => {
     });
 
     const contentType = response.headers['content-type'] || 'text/html';
-    console.log(`[VideoProxy] Response Content-Type: ${contentType}`);
+    console.log(`[VideoProxy] Response Content-Type: ${contentType}, Status: ${response.status}`);
 
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+
     res.removeHeader('X-Frame-Options');
     res.removeHeader('Content-Security-Policy');
+    res.status(response.status);
     
     if (contentType.includes('text/html')) {
       let html = response.data.toString('utf-8');
@@ -462,6 +423,13 @@ app.get('/api/video-proxy', async (req, res) => {
       if (response.headers['content-length']) {
         res.setHeader('Content-Length', response.headers['content-length']);
       }
+      if (response.headers['content-range']) {
+        res.setHeader('Content-Range', response.headers['content-range']);
+      }
+      if (response.headers['accept-ranges']) {
+        res.setHeader('Accept-Ranges', response.headers['accept-ranges']);
+      }
+
       res.send(response.data);
     }
   } catch (error) {
@@ -470,25 +438,11 @@ app.get('/api/video-proxy', async (req, res) => {
   }
 });
 
-/*
-// TODO: Fix route syntax for Express 5 compatibility
-app.get('/api/stream-proxy/:splat(.*)', async (req, res) => {
-  const urlPath = req.params.splat;
-  // ... (code temporarily disabled to prevent startup crash)
-});
-*/
-
 app.use(express.static(join(__dirname, 'dist'), {
   setHeaders: (res) => {
     res.setHeader('Cache-Control', 'no-cache');
   }
 }));
-
-/*
-app.get('/:splat(.*)', (req, res) => {
-  res.sendFile(join(__dirname, 'dist', 'index.html'));
-});
-*/
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

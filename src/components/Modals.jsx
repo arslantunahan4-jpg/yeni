@@ -9,11 +9,17 @@ import { scrapeHdfilmizle, isNativePlatform } from '../services/nativeHttp';
 const createSlug = (text) => {
     if (!text) return "";
     const trMap = { 'ç': 'c', 'ğ': 'g', 'ş': 's', 'ü': 'u', 'ı': 'i', 'ö': 'o', 'Ç': 'c', 'Ğ': 'g', 'Ş': 's', 'Ü': 'u', 'İ': 'i', 'Ö': 'o' };
-    return text.split('').map(char => trMap[char] || char).join('')
+    const slug = text.split('').map(char => trMap[char] || char).join('')
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '') // Harf rakam dışını sil
         .replace(/\s+/g, '-')         // Boşlukları tire yap
         .replace(/-+/g, '-');         // Çift tireleri düzelt
+
+    // If slug is empty (e.g. Japanese title), return the original text sanitized or specific fallback
+    if (!slug || slug.length === 0) {
+        return "movie";
+    }
+    return slug;
 };
 
 export const DetailModal = ({ movie, onClose, onPlay, onOpenDetail, apiKey }) => {
