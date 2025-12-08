@@ -22,6 +22,14 @@ export const HeroCarousel = memo(({ movies, onPlay, onDetails }) => {
     
     const movie = movies[index];
 
+    const prevSlide = () => {
+        setIndex(prev => (prev === 0 ? movies.length - 1 : prev - 1));
+    };
+
+    const nextSlide = () => {
+        setIndex(prev => (prev + 1) % movies.length);
+    };
+
     return (
         <div className="hero-section">
             <AnimatePresence mode="wait">
@@ -71,6 +79,24 @@ export const HeroCarousel = memo(({ movies, onPlay, onDetails }) => {
                     </div>
                 </motion.div>
             </div>
+
+            <button
+                className="scroll-btn left"
+                onClick={prevSlide}
+                style={{ left: '1rem', zIndex: 40 }}
+                aria-label="Önceki"
+            >
+                <i className="fas fa-chevron-left"></i>
+            </button>
+
+            <button
+                className="scroll-btn right"
+                onClick={nextSlide}
+                style={{ right: '1rem', zIndex: 40 }}
+                aria-label="Sonraki"
+            >
+                <i className="fas fa-chevron-right"></i>
+            </button>
             
             <div style={{
                 position: 'absolute',
@@ -103,12 +129,35 @@ export const HeroCarousel = memo(({ movies, onPlay, onDetails }) => {
 });
 
 export const Row = memo(({ title, data, onSelect, onLoadMore, isLoadingMore, hasMore = true, layout = 'portrait' }) => {
+    const scrollRef = React.useRef(null);
+
+    const handleScroll = (direction) => {
+        if (scrollRef.current) {
+            const { current } = scrollRef;
+            const scrollAmount = window.innerWidth * 0.8;
+            current.scrollBy({
+                left: direction === 'left' ? -scrollAmount : scrollAmount,
+                behavior: 'smooth'
+            });
+        }
+    };
+
     if (!data || data.length === 0) return <SkeletonRow />;
     
     return (
-        <div className="row-wrapper">
+        <div className="row-wrapper" style={{ position: 'relative' }}>
             <h3 className="row-header">{title}</h3>
-            <div className="row-scroll-container">
+
+            <button
+                className="scroll-btn left"
+                onClick={() => handleScroll('left')}
+                tabIndex="-1"
+                aria-label="Sola kaydır"
+            >
+                <i className="fas fa-chevron-left"></i>
+            </button>
+
+            <div className="row-scroll-container" ref={scrollRef}>
                 {data.map((m, i) => (
                     <Card 
                         key={`${m.id}-${i}`} 
@@ -141,6 +190,15 @@ export const Row = memo(({ title, data, onSelect, onLoadMore, isLoadingMore, has
                     </button>
                 )}
             </div>
+
+            <button
+                className="scroll-btn right"
+                onClick={() => handleScroll('right')}
+                tabIndex="-1"
+                aria-label="Sağa kaydır"
+            >
+                <i className="fas fa-chevron-right"></i>
+            </button>
         </div>
     );
 });
