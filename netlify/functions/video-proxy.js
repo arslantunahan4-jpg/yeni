@@ -70,7 +70,6 @@ exports.handler = async (event) => {
 
     console.log(`[VideoProxy] Fetching: ${targetUrl}`);
     console.log(`[VideoProxy] Using Referer: ${targetReferer}`);
-    if (proxyHeaders['Range']) console.log(`[VideoProxy] Forwarding Range: ${proxyHeaders['Range']}`);
 
     const response = await axios.get(targetUrl, {
       headers: proxyHeaders,
@@ -95,13 +94,15 @@ exports.handler = async (event) => {
           if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('magnet:')) return url;
 
           let absoluteUrl = url;
-          if (url.startsWith('//')) {
-            absoluteUrl = 'https:' + url;
-          } else if (url.startsWith('/')) {
-            absoluteUrl = new URL(url, baseUrl).href;
-          } else if (!url.startsWith('http')) {
-             absoluteUrl = new URL(url, targetUrl).href;
-          }
+          try {
+            if (url.startsWith('//')) {
+              absoluteUrl = 'https:' + url;
+            } else if (url.startsWith('/')) {
+              absoluteUrl = new URL(url, baseUrl).href;
+            } else if (!url.startsWith('http')) {
+               absoluteUrl = new URL(url, targetUrl).href;
+            }
+          } catch(e) { return url; }
 
           return `${PROXY_ENDPOINT}?url=${encodeURIComponent(absoluteUrl)}&referer=${encodeURIComponent(targetUrl)}`;
       };
@@ -146,21 +147,66 @@ exports.handler = async (event) => {
               return PROXY_URL + '?url=' + encodeURIComponent(absoluteUrl) + '&referer=' + encodeURIComponent(CURRENT_PAGE_URL);
             }
 
+            // Intercept XHR/Fetch
             const originalFetch = window.fetch;
             window.fetch = function(input, init) {
-              let url = input;
-              if (typeof input === 'string') {
-                url = rewriteUrl(input);
-              } else if (input instanceof Request) {
-                url = rewriteUrl(input.url);
+              if (input instanceof Request) {
+                try {
+                    const newUrl = rewriteUrl(input.url);
+                    // Cloning request with new URL is not directly possible via constructor if body is used
+                    // But for video segments (GET), it works.
+                    // If method is POST, body might be lost if we don't handle it, but Request(newUrl, input) copies it.
+                    const newRequest = new Request(newUrl, input);
+                    return originalFetch(newRequest, init);
+                } catch(e) {
+                    return originalFetch(input, init);
+                }
               }
-              return originalFetch(url, init);
+              return originalFetch(rewriteUrl(input), init);
             };
 
             const originalOpen = XMLHttpRequest.prototype.open;
             XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
               const newUrl = rewriteUrl(url);
               return originalOpen.apply(this, [method, newUrl, async, user, password]);
+            };
+
+            // Intercept Dynamic Element Creation (Scripts, Iframes)
+            const interceptNode = (node) => {
+                if (!node) return;
+                if (node.tagName === 'SCRIPT' && node.src) {
+                    node.src = rewriteUrl(node.src);
+                } else if (node.tagName === 'IFRAME' && node.src) {
+                    node.src = rewriteUrl(node.src);
+                } else if (node.tagName === 'LINK' && node.href) {
+                    node.href = rewriteUrl(node.href);
+                } else if (node.tagName === 'IMG' && node.src) {
+                    node.src = rewriteUrl(node.src);
+                }
+            };
+
+            const originalAppendChild = Node.prototype.appendChild;
+            Node.prototype.appendChild = function(node) {
+              interceptNode(node);
+              return originalAppendChild.call(this, node);
+            };
+
+            const originalInsertBefore = Node.prototype.insertBefore;
+            Node.prototype.insertBefore = function(node, child) {
+              interceptNode(node);
+              return originalInsertBefore.call(this, node, child);
+            };
+
+            // Also intercept setAttribute for src/href
+            const originalSetAttribute = Element.prototype.setAttribute;
+            Element.prototype.setAttribute = function(name, value) {
+                if ((this.tagName === 'SCRIPT' || this.tagName === 'IFRAME' || this.tagName === 'IMG') && name.toLowerCase() === 'src') {
+                    return originalSetAttribute.call(this, name, rewriteUrl(value));
+                }
+                if (this.tagName === 'LINK' && name.toLowerCase() === 'href') {
+                    return originalSetAttribute.call(this, name, rewriteUrl(value));
+                }
+                return originalSetAttribute.call(this, name, value);
             };
 
             Object.defineProperty(document, 'referrer', { get: () => ORIGINAL_REFERER });

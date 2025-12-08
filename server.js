@@ -299,7 +299,58 @@ app.get('/api/scrape-iframe', async (req, res) => {
         }
       }
     } else if (site === 'selcukflix') {
-        // ...
+      const urlVariations = [
+        `https://selcukflix.net/film/${slug}`,
+        `https://selcukflix.net/film/${slug}/izle`,
+        `https://selcukflix.net/${slug}`,
+        `https://selcukflix.net/film/${slug}-izle`,
+        `https://selcukflix.net/filmler/${slug}`
+      ];
+
+      for (const tryUrl of urlVariations) {
+        try {
+          console.log(`[Selcukflix] Trying: ${tryUrl}`);
+          const response = await axios.get(tryUrl, {
+            headers: {
+              ...headers,
+              Referer: 'https://selcukflix.net/',
+              Host: 'selcukflix.net'
+            },
+            timeout: 10000,
+            validateStatus: (status) => status < 500
+          });
+
+          if (response.status === 200) {
+            moviePageUrl = tryUrl;
+            const html = response.data;
+            const $ = cheerio.load(html);
+
+            $('iframe').each((i, el) => {
+              const src = $(el).attr('data-src') || $(el).attr('src');
+              if (src && !src.includes('google') && !src.includes('facebook') && !src.includes('ads')) {
+                iframeSrc = src.startsWith('//') ? 'https:' + src : src;
+                console.log(`[Selcukflix] Found iframe: ${iframeSrc}`);
+              }
+            });
+
+            if (!iframeSrc) {
+              const playerMatch = html.match(/player[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
+              const embedMatch = html.match(/embed[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
+              const videoMatch = html.match(/video[Uu]rl\s*[:=]\s*["']([^"']+)["']/);
+              const match = playerMatch || embedMatch || videoMatch;
+              if (match) {
+                iframeSrc = match[1].startsWith('//') ? 'https:' + match[1] : match[1];
+                console.log(`[Selcukflix] Found player URL: ${iframeSrc}`);
+              }
+            }
+
+            if (iframeSrc) break;
+          }
+        } catch (e) {
+          console.log(`[Selcukflix] Error trying ${tryUrl}:`, e.message);
+          continue;
+        }
+      }
     }
 
     if (iframeSrc) {
