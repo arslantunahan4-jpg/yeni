@@ -1,10 +1,12 @@
-import React, { memo, useState, useRef, useEffect, useLayoutEffect } from 'react';
-import { isWatched } from '../hooks/useAppLogic';
+import React, { memo, useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import { isWatched, fetchTMDB } from '../hooks/useAppLogic';
 
 export const BASE_IMG = "https://image.tmdb.org/t/p/w500";
 export const POSTER_IMG = "https://image.tmdb.org/t/p/w780";
 export const BACKDROP_IMG = "https://image.tmdb.org/t/p/w1280";
 export const ORIGINAL_IMG = "https://image.tmdb.org/t/p/original";
+
+const TRAILER_DELAY = 4000;
 
 export const SmartImage = memo(({ src, alt, style, className }) => {
     const [loaded, setLoaded] = useState(false);
@@ -209,17 +211,95 @@ export const MobileNav = memo(({ activeTab, onTabChange, onLogout }) => (
 
 export const Card = memo(({ movie, onSelect, layout = 'portrait', progress = 0 }) => {
     const isLandscape = layout === 'landscape';
-    const imgPath = isLandscape 
-        ? (movie.backdrop_path || movie.poster_path) 
-        : (movie.poster_path || movie.backdrop_path);
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [trailerKey, setTrailerKey] = useState(null);
+    const [showTrailer, setShowTrailer] = useState(false);
+    const [backdropLoaded, setBackdropLoaded] = useState(false);
+    
+    const cardRef = useRef(null);
+    const hoverTimerRef = useRef(null);
+    const trailerTimerRef = useRef(null);
+    const debounceRef = useRef(null);
+    
+    const posterPath = movie.poster_path || movie.backdrop_path;
+    const backdropPath = movie.backdrop_path || movie.poster_path;
     const watched = isWatched(movie.id, movie.season, movie.episode);
-    const hasValidImage = imgPath && imgPath !== 'null' && imgPath !== 'undefined';
+    const hasValidPoster = posterPath && posterPath !== 'null' && posterPath !== 'undefined';
+    const hasValidBackdrop = backdropPath && backdropPath !== 'null' && backdropPath !== 'undefined';
+    
+    const fetchTrailer = useCallback(async () => {
+        if (trailerKey) return;
+        const apiKey = localStorage.getItem('tmdb_api_key_v3');
+        if (!apiKey) return;
+        
+        const mediaType = movie.first_air_date ? 'tv' : 'movie';
+        const videos = await fetchTMDB(`/${mediaType}/${movie.id}/videos`, apiKey);
+        
+        if (videos?.results) {
+            const trailer = videos.results.find(v => 
+                v.type === 'Trailer' && v.site === 'YouTube'
+            ) || videos.results.find(v => 
+                v.site === 'YouTube'
+            );
+            if (trailer) {
+                setTrailerKey(trailer.key);
+            }
+        }
+    }, [movie.id, movie.first_air_date, trailerKey]);
+    
+    const handleExpand = useCallback(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        
+        debounceRef.current = setTimeout(() => {
+            setIsExpanded(true);
+            fetchTrailer();
+            
+            if (trailerTimerRef.current) clearTimeout(trailerTimerRef.current);
+            trailerTimerRef.current = setTimeout(() => {
+                setShowTrailer(true);
+            }, TRAILER_DELAY);
+        }, 50);
+    }, [fetchTrailer]);
+    
+    const handleCollapse = useCallback(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+        if (trailerTimerRef.current) clearTimeout(trailerTimerRef.current);
+        
+        setIsExpanded(false);
+        setShowTrailer(false);
+    }, []);
+    
+    useEffect(() => {
+        return () => {
+            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+            if (trailerTimerRef.current) clearTimeout(trailerTimerRef.current);
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
+    }, []);
+    
+    useEffect(() => {
+        if (isExpanded && hasValidBackdrop) {
+            const img = new Image();
+            img.onload = () => setBackdropLoaded(true);
+            img.src = BACKDROP_IMG + backdropPath;
+        } else if (!isExpanded) {
+            setBackdropLoaded(false);
+        }
+    }, [isExpanded, hasValidBackdrop, backdropPath]);
+    
+    const cardClassName = `poster-card focusable ${isLandscape ? 'card-landscape' : 'card-portrait'} ${isExpanded ? 'poster-card-expanded' : ''}`;
     
     return (
         <button 
+            ref={cardRef}
             tabIndex="0" 
             onClick={() => onSelect(movie)} 
-            className={`poster-card focusable ${isLandscape ? 'card-landscape' : 'card-portrait'}`}
+            onFocus={handleExpand}
+            onBlur={handleCollapse}
+            onMouseEnter={handleExpand}
+            onMouseLeave={handleCollapse}
+            className={cardClassName}
         >
             {watched && (
                 <div className="watched-badge">
@@ -232,28 +312,74 @@ export const Card = memo(({ movie, onSelect, layout = 'portrait', progress = 0 }
                     <div className="continue-progress-bar" style={{ width: `${progress}%` }}></div>
                 </div>
             )}
-            {hasValidImage ? (
-                <SmartImage 
-                    src={isLandscape ? BACKDROP_IMG + imgPath : POSTER_IMG + imgPath} 
-                    alt={movie.title || movie.name} 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                />
-            ) : (
-                <div style={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'linear-gradient(135deg, #1c1c1e 0%, #2c2c2e 100%)',
-                    color: 'rgba(255,255,255,0.3)',
-                    fontSize: '2.5rem'
-                }}>
-                    <i className="fas fa-film"></i>
+            
+            <div className="card-image-container">
+                {hasValidPoster && (
+                    <SmartImage 
+                        src={isLandscape ? BACKDROP_IMG + backdropPath : POSTER_IMG + posterPath} 
+                        alt={movie.title || movie.name} 
+                        className={`card-poster-image ${isExpanded && backdropLoaded ? 'card-image-hidden' : ''}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    />
+                )}
+                
+                {isExpanded && hasValidBackdrop && (
+                    <div className={`card-backdrop-image ${backdropLoaded ? 'card-image-visible' : ''}`}>
+                        <img 
+                            src={BACKDROP_IMG + backdropPath}
+                            alt={movie.title || movie.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                    </div>
+                )}
+                
+                {!hasValidPoster && !hasValidBackdrop && (
+                    <div style={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'linear-gradient(135deg, #1c1c1e 0%, #2c2c2e 100%)',
+                        color: 'rgba(255,255,255,0.3)',
+                        fontSize: '2.5rem'
+                    }}>
+                        <i className="fas fa-film"></i>
+                    </div>
+                )}
+            </div>
+            
+            {showTrailer && trailerKey && isExpanded && (
+                <div className="card-trailer-container">
+                    <iframe
+                        src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=0&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${trailerKey}`}
+                        title="Trailer"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        className="card-trailer-iframe"
+                    />
+                    <div className="card-trailer-overlay" />
                 </div>
             )}
+            
             <div className="card-overlay">
-                <span className="card-title">{movie.title || movie.name}</span>
+                <div className="card-info-expanded">
+                    <span className="card-title">{movie.title || movie.name}</span>
+                    {isExpanded && (
+                        <div className="card-meta-expanded">
+                            {movie.vote_average > 0 && (
+                                <span className="card-rating">
+                                    <i className="fas fa-star"></i> {movie.vote_average.toFixed(1)}
+                                </span>
+                            )}
+                            {(movie.release_date || movie.first_air_date) && (
+                                <span className="card-year">
+                                    {new Date(movie.release_date || movie.first_air_date).getFullYear()}
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
         </button>
     );

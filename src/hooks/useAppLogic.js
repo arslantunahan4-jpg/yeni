@@ -148,6 +148,48 @@ export const useTVNavigation = (isModalOpen, isPlayerOpen) => {
             }
 
             const currentRect = currentElement.getBoundingClientRect();
+            
+            if (direction === 'up' && !isModalOpen && !isPlayerOpen) {
+                const isInContentArea = currentElement.closest('.row-scroll-container') || 
+                                        currentElement.closest('.poster-card') ||
+                                        currentElement.closest('.hero-section');
+                
+                if (isInContentArea) {
+                    const navbarButtons = Array.from(document.querySelectorAll('.navbar-container .nav-btn.focusable, .navbar-container .nav-logout-btn'));
+                    const visibleNavButtons = navbarButtons.filter(el => {
+                        const style = window.getComputedStyle(el);
+                        const rect = el.getBoundingClientRect();
+                        return style.display !== 'none' && style.visibility !== 'hidden' && rect.height > 0;
+                    });
+                    
+                    if (visibleNavButtons.length > 0) {
+                        let closestNavBtn = null;
+                        let minHorizontalDist = Infinity;
+                        const currentCenterX = currentRect.left + currentRect.width / 2;
+                        
+                        visibleNavButtons.forEach(btn => {
+                            const btnRect = btn.getBoundingClientRect();
+                            const btnCenterX = btnRect.left + btnRect.width / 2;
+                            const horizontalDist = Math.abs(currentCenterX - btnCenterX);
+                            
+                            if (horizontalDist < minHorizontalDist) {
+                                minHorizontalDist = horizontalDist;
+                                closestNavBtn = btn;
+                            }
+                        });
+                        
+                        if (closestNavBtn && currentRect.top > 100) {
+                            if (closestNavBtn !== lastFocus.current) { 
+                                SoundManager.playHover(); 
+                                lastFocus.current = closestNavBtn; 
+                            }
+                            closestNavBtn.focus();
+                            return;
+                        }
+                    }
+                }
+            }
+
             const validFocusables = Array.from(document.querySelectorAll(scopeSelector)).filter(el => {
                 if(!isPlayerOpen && !isModalOpen && (el.closest('.detail-view-container') || el.closest('#player-container'))) return false;
                 const style = window.getComputedStyle(el);
