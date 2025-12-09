@@ -99,8 +99,13 @@ export const useSmartMouse = () => {
 
 export const useTVNavigation = (isModalOpen, isPlayerOpen) => {
     const lastFocus = useRef(null);
+    const lastNavTime = useRef(0);
+    const NAV_THROTTLE = 100;
+    
     useEffect(() => {
         const handleKeyDown = (e) => {
+            const now = Date.now();
+            
             const getDirection = (key, keyCode) => {
                 if (['ArrowUp', 'Up'].includes(key) || keyCode === 38) return 'up';
                 if (['ArrowDown', 'Down'].includes(key) || keyCode === 40) return 'down';
@@ -138,6 +143,13 @@ export const useTVNavigation = (isModalOpen, isPlayerOpen) => {
             }
             if (!direction) return;
             if (document.activeElement.tagName === 'INPUT' && (direction === 'left' || direction === 'right')) return;
+            
+            const isSyntheticEvent = !e.isTrusted;
+            if (!isSyntheticEvent && now - lastNavTime.current < NAV_THROTTLE) {
+                e.preventDefault();
+                return;
+            }
+            if (!isSyntheticEvent) lastNavTime.current = now;
 
             e.preventDefault();
             let scopeSelector = isPlayerOpen ? '#player-container .focusable' : isModalOpen ? '.detail-view-container .focusable' : '.focusable';
@@ -150,16 +162,16 @@ export const useTVNavigation = (isModalOpen, isPlayerOpen) => {
             const currentRect = currentElement.getBoundingClientRect();
             
             if (direction === 'up' && !isModalOpen && !isPlayerOpen) {
-                const isInContentArea = currentElement.closest('.row-scroll-container') || 
-                                        currentElement.closest('.poster-card') ||
-                                        currentElement.closest('.hero-section');
+                const rowContainer = currentElement.closest('.row-scroll-container');
+                const heroSection = currentElement.closest('.hero-section');
+                const NAVBAR_THRESHOLD = 120;
                 
-                if (isInContentArea) {
-                    const navbarButtons = Array.from(document.querySelectorAll('.navbar-container .nav-btn.focusable, .navbar-container .nav-logout-btn'));
+                if (currentRect.top < NAVBAR_THRESHOLD && !heroSection) {
+                    const navbarButtons = Array.from(document.querySelectorAll('.navbar-container .nav-btn.focusable, .navbar-container .nav-logout-btn.focusable'));
                     const visibleNavButtons = navbarButtons.filter(el => {
                         const style = window.getComputedStyle(el);
                         const rect = el.getBoundingClientRect();
-                        return style.display !== 'none' && style.visibility !== 'hidden' && rect.height > 0;
+                        return style.display !== 'none' && style.visibility !== 'hidden' && rect.height > 0 && rect.width > 0;
                     });
                     
                     if (visibleNavButtons.length > 0) {
@@ -178,14 +190,62 @@ export const useTVNavigation = (isModalOpen, isPlayerOpen) => {
                             }
                         });
                         
-                        if (closestNavBtn && currentRect.top > 100) {
+                        if (closestNavBtn) {
                             if (closestNavBtn !== lastFocus.current) { 
                                 SoundManager.playHover(); 
                                 lastFocus.current = closestNavBtn; 
                             }
-                            closestNavBtn.focus();
+                            closestNavBtn.focus({ preventScroll: true });
                             return;
                         }
+                    }
+                }
+            }
+            
+            if (direction === 'down' && !isModalOpen && !isPlayerOpen) {
+                const isInNavbar = currentElement.closest('.navbar-container');
+                
+                if (isInNavbar) {
+                    const heroButtons = Array.from(document.querySelectorAll('.hero-section .hero-button.focusable'));
+                    const visibleHeroButtons = heroButtons.filter(el => {
+                        const style = window.getComputedStyle(el);
+                        const rect = el.getBoundingClientRect();
+                        return style.display !== 'none' && style.visibility !== 'hidden' && rect.height > 0 && rect.width > 0;
+                    });
+                    
+                    if (visibleHeroButtons.length > 0) {
+                        const firstHeroBtn = visibleHeroButtons[0];
+                        if (firstHeroBtn !== lastFocus.current) {
+                            SoundManager.playHover();
+                            lastFocus.current = firstHeroBtn;
+                        }
+                        firstHeroBtn.focus();
+                        return;
+                    }
+                    
+                    const contentFocusables = Array.from(document.querySelectorAll('.content-wrapper .focusable'));
+                    const visibleContentElements = contentFocusables.filter(el => {
+                        if (el.closest('.detail-view-container') || el.closest('#player-container')) return false;
+                        const style = window.getComputedStyle(el);
+                        const rect = el.getBoundingClientRect();
+                        return style.display !== 'none' && style.visibility !== 'hidden' && rect.height > 0 && rect.width > 0 && rect.top > 60;
+                    });
+                    
+                    if (visibleContentElements.length > 0) {
+                        visibleContentElements.sort((a, b) => {
+                            const rectA = a.getBoundingClientRect();
+                            const rectB = b.getBoundingClientRect();
+                            return rectA.top - rectB.top || rectA.left - rectB.left;
+                        });
+                        
+                        const firstElement = visibleContentElements[0];
+                        if (firstElement !== lastFocus.current) {
+                            SoundManager.playHover();
+                            lastFocus.current = firstElement;
+                        }
+                        firstElement.focus();
+                        firstElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                        return;
                     }
                 }
             }
@@ -227,6 +287,7 @@ export const useTVNavigation = (isModalOpen, isPlayerOpen) => {
         const recoveryInterval = setInterval(() => {
             const active = document.activeElement;
             if (!active || active === document.body) {
+                lastNavTime.current = 0;
                 if (isPlayerOpen) document.getElementById('video-frame')?.focus();
                 else if (isModalOpen) document.querySelector('.detail-view-container .focusable')?.focus();
                 else document.querySelector('.nav-btn.btn-active')?.focus();
@@ -238,28 +299,128 @@ export const useTVNavigation = (isModalOpen, isPlayerOpen) => {
 };
 
 export const useGamepadNavigation = () => {
-    const lastPress = useRef(0);
+    const lastPressRef = useRef({});
     const reqRef = useRef(null);
+    const axisHeldRef = useRef({ x: false, y: false });
+    const repeatTimerRef = useRef({});
+    
     useEffect(() => {
-        const triggerKey = (key) => window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
-        const scanGamepads = () => {
-            const gp = (navigator.getGamepads ? navigator.getGamepads() : [])[0];
-            if (gp) {
-                const now = Date.now();
-                if (now - lastPress.current > 150) {
-                    if (gp.axes[1] < -0.5 || gp.buttons[12]?.pressed) { triggerKey('ArrowUp'); lastPress.current = now; }
-                    else if (gp.axes[1] > 0.5 || gp.buttons[13]?.pressed) { triggerKey('ArrowDown'); lastPress.current = now; }
-                    else if (gp.axes[0] < -0.5 || gp.buttons[14]?.pressed) { triggerKey('ArrowLeft'); lastPress.current = now; }
-                    else if (gp.axes[0] > 0.5 || gp.buttons[15]?.pressed) { triggerKey('ArrowRight'); lastPress.current = now; }
-                    else if (gp.buttons[0]?.pressed) { if(document.activeElement) document.activeElement.click(); lastPress.current = now + 150; }
-                    else if (gp.buttons[1]?.pressed) { triggerKey('Escape'); lastPress.current = now + 150; }
+        const INITIAL_DELAY = 200;
+        const REPEAT_DELAY = 120;
+        const AXIS_THRESHOLD = 0.5;
+        const BUTTON_COOLDOWN = 250;
+        
+        const triggerKey = (key) => {
+            window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+            SoundManager.playHover();
+        };
+        
+        const handleAction = (action, isPressed) => {
+            const now = Date.now();
+            const lastPress = lastPressRef.current[action] || 0;
+            
+            if (isPressed) {
+                if (!repeatTimerRef.current[action]) {
+                    if (now - lastPress > INITIAL_DELAY) {
+                        if (action === 'select') {
+                            const active = document.activeElement;
+                            if (active && active.classList.contains('focusable')) {
+                                SoundManager.playSelect();
+                                active.click();
+                            }
+                        } else if (action === 'back') {
+                            window.history.back();
+                        } else {
+                            triggerKey(action);
+                        }
+                        lastPressRef.current[action] = now;
+                        
+                        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(action)) {
+                            repeatTimerRef.current[action] = setTimeout(function repeat() {
+                                triggerKey(action);
+                                lastPressRef.current[action] = Date.now();
+                                repeatTimerRef.current[action] = setTimeout(repeat, REPEAT_DELAY);
+                            }, INITIAL_DELAY);
+                        }
+                    }
+                }
+            } else {
+                if (repeatTimerRef.current[action]) {
+                    clearTimeout(repeatTimerRef.current[action]);
+                    repeatTimerRef.current[action] = null;
                 }
             }
+        };
+        
+        const scanGamepads = () => {
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            const gp = gamepads[0] || gamepads[1] || gamepads[2] || gamepads[3];
+            
+            if (gp) {
+                const axisY = gp.axes[1] || 0;
+                const axisX = gp.axes[0] || 0;
+                
+                const dpadUp = gp.buttons[12]?.pressed;
+                const dpadDown = gp.buttons[13]?.pressed;
+                const dpadLeft = gp.buttons[14]?.pressed;
+                const dpadRight = gp.buttons[15]?.pressed;
+                
+                handleAction('ArrowUp', axisY < -AXIS_THRESHOLD || dpadUp);
+                handleAction('ArrowDown', axisY > AXIS_THRESHOLD || dpadDown);
+                handleAction('ArrowLeft', axisX < -AXIS_THRESHOLD || dpadLeft);
+                handleAction('ArrowRight', axisX > AXIS_THRESHOLD || dpadRight);
+                
+                handleAction('select', gp.buttons[0]?.pressed);
+                handleAction('back', gp.buttons[1]?.pressed);
+                
+                if (gp.buttons[2]?.pressed) {
+                    handleAction('menu', true);
+                } else {
+                    handleAction('menu', false);
+                }
+                
+                if (gp.buttons[4]?.pressed) {
+                    handleAction('lb', true);
+                }
+                if (gp.buttons[5]?.pressed) {
+                    handleAction('rb', true);
+                }
+            }
+            
             reqRef.current = requestAnimationFrame(scanGamepads);
         };
-        window.addEventListener("gamepadconnected", scanGamepads);
-        scanGamepads();
-        return () => cancelAnimationFrame(reqRef.current);
+        
+        const handleGamepadConnected = (e) => {
+            console.log('Gamepad connected:', e.gamepad.id);
+            if (!reqRef.current) {
+                scanGamepads();
+            }
+        };
+        
+        const handleGamepadDisconnected = (e) => {
+            console.log('Gamepad disconnected:', e.gamepad.id);
+        };
+        
+        window.addEventListener("gamepadconnected", handleGamepadConnected);
+        window.addEventListener("gamepaddisconnected", handleGamepadDisconnected);
+        
+        if (navigator.getGamepads) {
+            const gamepads = navigator.getGamepads();
+            if (gamepads[0] || gamepads[1] || gamepads[2] || gamepads[3]) {
+                scanGamepads();
+            }
+        }
+        
+        return () => {
+            if (reqRef.current) {
+                cancelAnimationFrame(reqRef.current);
+            }
+            Object.values(repeatTimerRef.current).forEach(timer => {
+                if (timer) clearTimeout(timer);
+            });
+            window.removeEventListener("gamepadconnected", handleGamepadConnected);
+            window.removeEventListener("gamepaddisconnected", handleGamepadDisconnected);
+        };
     }, []);
 };
 

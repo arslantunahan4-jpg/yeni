@@ -172,8 +172,9 @@ export const NavBar = memo(({ activeTab, onTabChange, onLogout }) => {
             <div className="nav-profile">
                 {onLogout && (
                     <button 
+                        tabIndex="0"
                         onClick={onLogout}
-                        className="nav-logout-btn"
+                        className="focusable nav-logout-btn"
                         title="Çıkış Yap"
                     >
                         <i className="fas fa-power-off"></i>
