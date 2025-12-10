@@ -252,19 +252,25 @@ iframe.focusable:focus {
 }
 
 .nav-btn:focus { 
-  outline: none;
-  box-shadow: none;
-  border: none;
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 
+.nav-btn:focus::before,
 .nav-btn:focus::after {
-  border-radius: 22px;
-  inset: -3px;
+  display: none !important;
+  content: none !important;
 }
 
+.nav-logout-btn:focus {
+  outline: none !important;
+}
+
+.nav-logout-btn:focus::before,
 .nav-logout-btn:focus::after {
-  border-radius: 50%;
-  inset: -3px;
+  display: none !important;
+  content: none !important;
 }
 
 .nav-profile {
@@ -2210,8 +2216,8 @@ iframe.focusable:focus {
   position: absolute;
   left: 24px;
   top: 16px;
-  width: 180px;
-  aspect-ratio: 2/3;
+  width: 320px;
+  aspect-ratio: 16/9;
   z-index: 100;
   pointer-events: auto;
   border-radius: 14px;
@@ -2225,13 +2231,14 @@ iframe.focusable:focus {
 @media (min-width: 769px) {
   .tv-focus-frame {
     left: 32px;
+    width: 400px;
   }
 }
 
 @media (min-width: 1601px) {
   .tv-focus-frame {
     left: 3vw;
-    width: 14rem;
+    width: 28rem;
     border-radius: 16px;
   }
 }
@@ -2339,7 +2346,7 @@ iframe.focusable:focus {
 
 .tv-row-item {
   flex-shrink: 0;
-  width: 180px;
+  width: 280px;
   transition: transform 0.25s cubic-bezier(0.33, 1, 0.68, 1),
               opacity 0.25s ease;
   will-change: transform, opacity;
@@ -2349,9 +2356,15 @@ iframe.focusable:focus {
   border: none;
 }
 
+@media (min-width: 769px) {
+  .tv-row-item {
+    width: 320px;
+  }
+}
+
 @media (min-width: 1601px) {
   .tv-row-item {
-    width: 14rem;
+    width: 22rem;
   }
 }
 
@@ -2490,7 +2503,7 @@ iframe.focusable:focus {
 .tv-row-item-poster {
   position: relative;
   width: 100%;
-  aspect-ratio: 2/3;
+  aspect-ratio: 16/9;
   border-radius: 10px;
   overflow: hidden;
   background: var(--bg-secondary);
@@ -2532,12 +2545,24 @@ iframe.focusable:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 180px;
-  height: 270px;
+  width: 280px;
+  aspect-ratio: 16/9;
   flex-shrink: 0;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
   margin-left: 16px;
+}
+
+@media (min-width: 769px) {
+  .tv-row-loading {
+    width: 320px;
+  }
+}
+
+@media (min-width: 1601px) {
+  .tv-row-loading {
+    width: 22rem;
+  }
 }
 
 .tv-row-loading-spinner {

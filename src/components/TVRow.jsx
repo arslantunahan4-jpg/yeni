@@ -1,14 +1,17 @@
 import React, { memo, useState, useRef, useEffect, useCallback } from 'react';
-import { SmartImage, POSTER_IMG } from './Shared';
-import { SoundManager } from '../hooks/useAppLogic';
+import { SmartImage, BACKDROP_IMG } from './Shared';
+import { SoundManager, fetchTMDB } from '../hooks/useAppLogic';
 import { ImageCache } from '../services/imageCache';
 
-const CARD_WIDTH = 180;
+const CARD_WIDTH = 280;
 const CARD_GAP = 16;
 const TRANSITION_DURATION = 300;
 const FRAME_LEFT_OFFSET = 24;
 const PRELOAD_THRESHOLD = 5;
 const PAGINATION_THRESHOLD = 3;
+const TRAILER_DELAY = 4000;
+
+const trailerCache = new Map();
 
 export const TVRow = memo(({ 
     title, 
@@ -21,15 +24,88 @@ export const TVRow = memo(({
 }) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [isFocused, setIsFocused] = useState(false);
+    const [trailerKey, setTrailerKey] = useState(null);
+    const [showTrailer, setShowTrailer] = useState(false);
     const focusRef = useRef(null);
     const carouselRef = useRef(null);
     const loadMoreTriggeredRef = useRef(false);
+    const trailerTimerRef = useRef(null);
+    const fetchingRef = useRef(null);
     
     const itemCount = data?.length || 0;
     
     const getTransformX = useCallback((index) => {
         return -(index * (CARD_WIDTH + CARD_GAP));
     }, []);
+    
+    const fetchTrailer = useCallback(async (movie) => {
+        if (!movie) return;
+        
+        const movieId = movie.id;
+        
+        if (trailerCache.has(movieId)) {
+            setTrailerKey(trailerCache.get(movieId));
+            return;
+        }
+        
+        if (fetchingRef.current === movieId) return;
+        
+        const apiKey = localStorage.getItem('tmdb_api_key_v3');
+        if (!apiKey) return;
+        
+        fetchingRef.current = movieId;
+        const mediaType = movie.first_air_date ? 'tv' : 'movie';
+        
+        try {
+            const videos = await fetchTMDB(`/${mediaType}/${movieId}/videos`, apiKey);
+            
+            if (videos?.results) {
+                const trailer = videos.results.find(v => 
+                    v.type === 'Trailer' && v.site === 'YouTube'
+                ) || videos.results.find(v => 
+                    v.site === 'YouTube'
+                );
+                if (trailer) {
+                    trailerCache.set(movieId, trailer.key);
+                    if (fetchingRef.current === movieId) {
+                        setTrailerKey(trailer.key);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching trailer:', error);
+        } finally {
+            if (fetchingRef.current === movieId) {
+                fetchingRef.current = null;
+            }
+        }
+    }, []);
+    
+    useEffect(() => {
+        if (isFocused && data?.[selectedIndex]) {
+            const currentMovie = data[selectedIndex];
+            fetchTrailer(currentMovie);
+            
+            if (trailerTimerRef.current) clearTimeout(trailerTimerRef.current);
+            trailerTimerRef.current = setTimeout(() => {
+                setShowTrailer(true);
+            }, TRAILER_DELAY);
+        } else {
+            if (trailerTimerRef.current) clearTimeout(trailerTimerRef.current);
+            setShowTrailer(false);
+        }
+        
+        return () => {
+            if (trailerTimerRef.current) clearTimeout(trailerTimerRef.current);
+        };
+    }, [isFocused, selectedIndex, data, fetchTrailer]);
+    
+    useEffect(() => {
+        setShowTrailer(false);
+        setTrailerKey(null);
+        fetchingRef.current = null;
+        if (trailerTimerRef.current) clearTimeout(trailerTimerRef.current);
+    }, [selectedIndex]);
     
     useEffect(() => {
         if (!data || data.length === 0) return;
@@ -42,9 +118,9 @@ export const TVRow = memo(({
             for (let i = start; i < end; i++) {
                 const item = data[i];
                 if (item) {
-                    const posterPath = item.poster_path || item.backdrop_path;
-                    if (posterPath) {
-                        urls.push(POSTER_IMG + posterPath);
+                    const backdropPath = item.backdrop_path || item.poster_path;
+                    if (backdropPath) {
+                        urls.push(BACKDROP_IMG + backdropPath);
                     }
                 }
             }
@@ -176,7 +252,7 @@ export const TVRow = memo(({
                     <div className="tv-focus-frame-content">
                         {currentMovie && (
                             <SmartImage 
-                                src={POSTER_IMG + (currentMovie.poster_path || currentMovie.backdrop_path)} 
+                                src={BACKDROP_IMG + (currentMovie.backdrop_path || currentMovie.poster_path)} 
                                 alt={currentMovie.title || currentMovie.name}
                                 style={{ 
                                     width: '100%', 
@@ -185,6 +261,38 @@ export const TVRow = memo(({
                                     borderRadius: '12px'
                                 }}
                             />
+                        )}
+                        {showTrailer && trailerKey && isFocused && (
+                            <div style={{
+                                position: 'absolute',
+                                inset: 0,
+                                zIndex: 5,
+                                overflow: 'hidden',
+                                borderRadius: '12px'
+                            }}>
+                                <iframe
+                                    src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=0&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${trailerKey}`}
+                                    title="Trailer"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                    style={{
+                                        position: 'absolute',
+                                        top: '50%',
+                                        left: '50%',
+                                        width: '180%',
+                                        height: '180%',
+                                        transform: 'translate(-50%, -50%)',
+                                        border: 'none',
+                                        pointerEvents: 'none'
+                                    }}
+                                />
+                                <div style={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 40%)',
+                                    pointerEvents: 'none'
+                                }} />
+                            </div>
                         )}
                         <div className="tv-focus-frame-overlay">
                             <span className="tv-focus-frame-title">
@@ -206,7 +314,7 @@ export const TVRow = memo(({
                     style={{
                         transform: `translate3d(${transformX}px, 0, 0)`,
                         transition: `transform ${TRANSITION_DURATION}ms cubic-bezier(0.33, 1, 0.68, 1)`,
-                        marginLeft: `${CARD_WIDTH + CARD_GAP + FRAME_LEFT_OFFSET}px`
+                        marginLeft: `${320 + CARD_GAP + FRAME_LEFT_OFFSET}px`
                     }}
                 >
                     {data.map((movie, index) => {
@@ -261,7 +369,7 @@ export const TVRow = memo(({
                             >
                                 <div className="tv-row-item-poster">
                                     <SmartImage 
-                                        src={POSTER_IMG + (movie.poster_path || movie.backdrop_path)} 
+                                        src={BACKDROP_IMG + (movie.backdrop_path || movie.poster_path)} 
                                         alt={movie.title || movie.name}
                                         style={{ 
                                             width: '100%', 
