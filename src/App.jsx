@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTVNavigation, useGamepadNavigation, useSmartMouse, fetchTMDB, getStorageData } from './hooks/useAppLogic';
 import { NavBar, MobileNav, SmartImage, POSTER_IMG } from './components/Shared';
 import { HeroCarousel, Row } from './components/HomeWidgets';
+import { TVRow } from './components/TVRow';
 import { DetailModal, Player } from './components/Modals';
 import IntroAnimation from './components/IntroAnimation';
 import './index.css';
@@ -97,6 +98,18 @@ const App = () => {
     const [selectedMovie, setSelectedMovie] = useState(null);
     const [playingMovie, setPlayingMovie] = useState(null);
     const [playParams, setPlayParams] = useState({ s: 1, e: 1 });
+    const [tvMode, setTvMode] = useState(() => {
+        const saved = localStorage.getItem('noxis_tv_mode');
+        return saved === 'true';
+    });
+
+    const toggleTvMode = useCallback(() => {
+        setTvMode(prev => {
+            const newValue = !prev;
+            localStorage.setItem('noxis_tv_mode', String(newValue));
+            return newValue;
+        });
+    }, []);
 
     useTVNavigation(!!selectedMovie, !!playingMovie);
     useGamepadNavigation();
@@ -461,6 +474,37 @@ const App = () => {
                                     onDetails={openDetail} 
                                 />
                                 <div style={{ background: 'var(--bg-primary)', paddingTop: '24px' }}>
+                                    <div style={{ 
+                                        display: 'flex', 
+                                        justifyContent: 'flex-end', 
+                                        padding: '0 16px 16px',
+                                        gap: '8px'
+                                    }}>
+                                        <button
+                                            onClick={toggleTvMode}
+                                            className="focusable"
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                padding: '10px 16px',
+                                                background: tvMode 
+                                                    ? 'linear-gradient(135deg, rgba(138,43,226,0.6), rgba(75,0,130,0.6))'
+                                                    : 'rgba(255,255,255,0.08)',
+                                                border: '1px solid rgba(255,255,255,0.15)',
+                                                borderRadius: '10px',
+                                                color: 'white',
+                                                fontSize: '13px',
+                                                fontWeight: '600',
+                                                cursor: 'pointer',
+                                                backdropFilter: 'blur(10px)',
+                                                transition: 'all 0.3s ease'
+                                            }}
+                                        >
+                                            <i className={`fas ${tvMode ? 'fa-tv' : 'fa-desktop'}`}></i>
+                                            {tvMode ? 'TV Modu Aktif' : 'TV Modu'}
+                                        </button>
+                                    </div>
                                     {data.continue.length > 0 && (
                                         <Row 
                                             title="Kaldığın Yerden Devam Et" 
@@ -469,28 +513,53 @@ const App = () => {
                                             layout="landscape" 
                                         />
                                     )}
-                                    <Row 
-                                        title={GENRE_TRANSLATIONS.trending} 
-                                        data={data.trending.results} 
-                                        onSelect={openDetail} 
-                                        onLoadMore={() => loadData('trending', '/trending/all/day', data.trending.page + 1)} 
-                                        hasMore={data.trending.page < data.trending.total_pages} 
-                                        isLoadingMore={loading} 
-                                    />
-                                    <Row 
-                                        title={GENRE_TRANSLATIONS.popularMovies} 
-                                        data={data.popularMovies.results} 
-                                        onSelect={openDetail} 
-                                        onLoadMore={() => loadData('popularMovies', '/movie/popular', data.popularMovies.page + 1)} 
-                                        hasMore={data.popularMovies.page < data.popularMovies.total_pages} 
-                                    />
-                                    <Row 
-                                        title={GENRE_TRANSLATIONS.popularTV} 
-                                        data={data.popularTV.results} 
-                                        onSelect={openDetail} 
-                                        onLoadMore={() => loadData('popularTV', '/tv/popular', data.popularTV.page + 1)} 
-                                        hasMore={data.popularTV.page < data.popularTV.total_pages} 
-                                    />
+                                    {tvMode ? (
+                                        <>
+                                            <TVRow 
+                                                title={GENRE_TRANSLATIONS.trending} 
+                                                data={data.trending.results} 
+                                                onSelect={openDetail} 
+                                                rowId="trending"
+                                            />
+                                            <TVRow 
+                                                title={GENRE_TRANSLATIONS.popularMovies} 
+                                                data={data.popularMovies.results} 
+                                                onSelect={openDetail} 
+                                                rowId="popularMovies"
+                                            />
+                                            <TVRow 
+                                                title={GENRE_TRANSLATIONS.popularTV} 
+                                                data={data.popularTV.results} 
+                                                onSelect={openDetail} 
+                                                rowId="popularTV"
+                                            />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Row 
+                                                title={GENRE_TRANSLATIONS.trending} 
+                                                data={data.trending.results} 
+                                                onSelect={openDetail} 
+                                                onLoadMore={() => loadData('trending', '/trending/all/day', data.trending.page + 1)} 
+                                                hasMore={data.trending.page < data.trending.total_pages} 
+                                                isLoadingMore={loading} 
+                                            />
+                                            <Row 
+                                                title={GENRE_TRANSLATIONS.popularMovies} 
+                                                data={data.popularMovies.results} 
+                                                onSelect={openDetail} 
+                                                onLoadMore={() => loadData('popularMovies', '/movie/popular', data.popularMovies.page + 1)} 
+                                                hasMore={data.popularMovies.page < data.popularMovies.total_pages} 
+                                            />
+                                            <Row 
+                                                title={GENRE_TRANSLATIONS.popularTV} 
+                                                data={data.popularTV.results} 
+                                                onSelect={openDetail} 
+                                                onLoadMore={() => loadData('popularTV', '/tv/popular', data.popularTV.page + 1)} 
+                                                hasMore={data.popularTV.page < data.popularTV.total_pages} 
+                                            />
+                                        </>
+                                    )}
                                 </div>
                             </>
                         )}

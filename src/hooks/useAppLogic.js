@@ -106,6 +106,8 @@ export const useTVNavigation = (isModalOpen, isPlayerOpen) => {
         const handleKeyDown = (e) => {
             const now = Date.now();
             
+            const isTVRowFocused = document.activeElement?.closest('.tv-focus-frame');
+            
             const getDirection = (key, keyCode) => {
                 if (['ArrowUp', 'Up'].includes(key) || keyCode === 38) return 'up';
                 if (['ArrowDown', 'Down'].includes(key) || keyCode === 40) return 'down';
@@ -114,6 +116,10 @@ export const useTVNavigation = (isModalOpen, isPlayerOpen) => {
                 return null;
             };
             const direction = getDirection(e.key, e.keyCode);
+            
+            if (isTVRowFocused && (direction === 'left' || direction === 'right')) {
+                return;
+            }
             
             const activeTag = document.activeElement?.tagName;
             const isInInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag);
