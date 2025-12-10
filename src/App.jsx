@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTVNavigation, useGamepadNavigation, useSmartMouse, fetchTMDB, getStorageData } from './hooks/useAppLogic';
 import { NavBar, MobileNav, SmartImage, POSTER_IMG } from './components/Shared';
@@ -95,6 +95,8 @@ const App = () => {
         scifiTV: { results: [], page: 1, total_pages: 1 }
     });
     const [loading, setLoading] = useState(false);
+    const [rowLoadingState, setRowLoadingState] = useState({});
+    const rowLoadingRef = useRef({});
     const [selectedMovie, setSelectedMovie] = useState(null);
     const [playingMovie, setPlayingMovie] = useState(null);
     const [playParams, setPlayParams] = useState({ s: 1, e: 1 });
@@ -160,21 +162,31 @@ const App = () => {
     }, []);
 
     const loadData = useCallback(async (key, endpoint, page) => {
-        setLoading(true); 
-        const res = await fetchTMDB(endpoint + (endpoint.includes('?') ? '&' : '?') + `page=${page}`, apiKey); 
-        setLoading(false);
-        if (res && res.results) {
-            setData(prev => ({ 
-                ...prev, 
-                [key]: { 
-                    results: page === 1 ? res.results : [...prev[key].results, ...res.results], 
-                    page: page, 
-                    total_pages: res.total_pages || 1 
-                } 
-            }));
-            if (key === 'trending' && page === 1) {
-                setData(prev => ({ ...prev, hero: res.results.slice(0, 6) }));
+        if (rowLoadingRef.current[key]) return;
+        
+        rowLoadingRef.current[key] = true;
+        setRowLoadingState(prev => ({ ...prev, [key]: true }));
+        setLoading(true);
+        
+        try {
+            const res = await fetchTMDB(endpoint + (endpoint.includes('?') ? '&' : '?') + `page=${page}`, apiKey); 
+            if (res && res.results) {
+                setData(prev => ({ 
+                    ...prev, 
+                    [key]: { 
+                        results: page === 1 ? res.results : [...prev[key].results, ...res.results], 
+                        page: page, 
+                        total_pages: res.total_pages || 1 
+                    } 
+                }));
+                if (key === 'trending' && page === 1) {
+                    setData(prev => ({ ...prev, hero: res.results.slice(0, 6) }));
+                }
             }
+        } finally {
+            rowLoadingRef.current[key] = false;
+            setRowLoadingState(prev => ({ ...prev, [key]: false }));
+            setLoading(false);
         }
     }, [apiKey]);
 
@@ -520,18 +532,27 @@ const App = () => {
                                                 data={data.trending.results} 
                                                 onSelect={openDetail} 
                                                 rowId="trending"
+                                                onLoadMore={() => loadData('trending', '/trending/all/day', data.trending.page + 1)}
+                                                hasMore={data.trending.page < data.trending.total_pages}
+                                                isLoading={rowLoadingState.trending || false}
                                             />
                                             <TVRow 
                                                 title={GENRE_TRANSLATIONS.popularMovies} 
                                                 data={data.popularMovies.results} 
                                                 onSelect={openDetail} 
                                                 rowId="popularMovies"
+                                                onLoadMore={() => loadData('popularMovies', '/movie/popular', data.popularMovies.page + 1)}
+                                                hasMore={data.popularMovies.page < data.popularMovies.total_pages}
+                                                isLoading={rowLoadingState.popularMovies || false}
                                             />
                                             <TVRow 
                                                 title={GENRE_TRANSLATIONS.popularTV} 
                                                 data={data.popularTV.results} 
                                                 onSelect={openDetail} 
                                                 rowId="popularTV"
+                                                onLoadMore={() => loadData('popularTV', '/tv/popular', data.popularTV.page + 1)}
+                                                hasMore={data.popularTV.page < data.popularTV.total_pages}
+                                                isLoading={rowLoadingState.popularTV || false}
                                             />
                                         </>
                                     ) : (
@@ -580,14 +601,66 @@ const App = () => {
                                     </h1>
                                 </div>
                                 <div style={{ paddingBottom: '100px' }}>
-                                    {activeTab === 'Filmler' ?
-                                        ['actionMovies', 'comedyMovies', 'horrorMovies', 'romanticMovies', 'scifiMovies'].map(k => (
-                                            <Row key={k} title={GENRE_TRANSLATIONS[k]} data={data[k].results} onSelect={openDetail} />
-                                        )) :
-                                        ['crimeTV', 'comedyTV', 'dramaTV', 'scifiTV'].map(k => (
-                                            <Row key={k} title={GENRE_TRANSLATIONS[k]} data={data[k].results} onSelect={openDetail} />
-                                        ))
-                                    }
+                                    {activeTab === 'Filmler' ? (
+                                        tvMode ? (
+                                            <>
+                                                {['actionMovies', 'comedyMovies', 'horrorMovies', 'romanticMovies', 'scifiMovies'].map(k => {
+                                                    const endpointMap = {
+                                                        actionMovies: '/discover/movie?with_genres=28',
+                                                        comedyMovies: '/discover/movie?with_genres=35',
+                                                        horrorMovies: '/discover/movie?with_genres=27',
+                                                        romanticMovies: '/discover/movie?with_genres=10749',
+                                                        scifiMovies: '/discover/movie?with_genres=878'
+                                                    };
+                                                    return (
+                                                        <TVRow 
+                                                            key={k} 
+                                                            title={GENRE_TRANSLATIONS[k]} 
+                                                            data={data[k].results} 
+                                                            onSelect={openDetail}
+                                                            rowId={k}
+                                                            onLoadMore={() => loadData(k, endpointMap[k], data[k].page + 1)}
+                                                            hasMore={data[k].page < data[k].total_pages}
+                                                            isLoading={rowLoadingState[k] || false}
+                                                        />
+                                                    );
+                                                })}
+                                            </>
+                                        ) : (
+                                            ['actionMovies', 'comedyMovies', 'horrorMovies', 'romanticMovies', 'scifiMovies'].map(k => (
+                                                <Row key={k} title={GENRE_TRANSLATIONS[k]} data={data[k].results} onSelect={openDetail} />
+                                            ))
+                                        )
+                                    ) : (
+                                        tvMode ? (
+                                            <>
+                                                {['crimeTV', 'comedyTV', 'dramaTV', 'scifiTV'].map(k => {
+                                                    const endpointMap = {
+                                                        crimeTV: '/discover/tv?with_genres=80',
+                                                        comedyTV: '/discover/tv?with_genres=35',
+                                                        dramaTV: '/discover/tv?with_genres=18',
+                                                        scifiTV: '/discover/tv?with_genres=10765'
+                                                    };
+                                                    return (
+                                                        <TVRow 
+                                                            key={k} 
+                                                            title={GENRE_TRANSLATIONS[k]} 
+                                                            data={data[k].results} 
+                                                            onSelect={openDetail}
+                                                            rowId={k}
+                                                            onLoadMore={() => loadData(k, endpointMap[k], data[k].page + 1)}
+                                                            hasMore={data[k].page < data[k].total_pages}
+                                                            isLoading={rowLoadingState[k] || false}
+                                                        />
+                                                    );
+                                                })}
+                                            </>
+                                        ) : (
+                                            ['crimeTV', 'comedyTV', 'dramaTV', 'scifiTV'].map(k => (
+                                                <Row key={k} title={GENRE_TRANSLATIONS[k]} data={data[k].results} onSelect={openDetail} />
+                                            ))
+                                        )
+                                    )}
                                 </div>
                             </div>
                         )}

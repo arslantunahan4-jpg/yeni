@@ -1,5 +1,6 @@
 import React, { memo, useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { isWatched, fetchTMDB } from '../hooks/useAppLogic';
+import { ImageCache } from '../services/imageCache';
 
 export const BASE_IMG = "https://image.tmdb.org/t/p/w500";
 export const POSTER_IMG = "https://image.tmdb.org/t/p/w780";
@@ -9,8 +10,23 @@ export const ORIGINAL_IMG = "https://image.tmdb.org/t/p/original";
 const TRAILER_DELAY = 4000;
 
 export const SmartImage = memo(({ src, alt, style, className }) => {
-    const [loaded, setLoaded] = useState(false);
+    const cachedImage = ImageCache.get(src);
+    const [loaded, setLoaded] = useState(() => !!cachedImage);
     const [error, setError] = useState(false);
+    const imgSrc = cachedImage ? cachedImage.src : src;
+    
+    useEffect(() => {
+        if (src && !loaded && !error) {
+            const cached = ImageCache.get(src);
+            if (cached) {
+                setLoaded(true);
+            } else {
+                ImageCache.preload(src)
+                    .then(() => setLoaded(true))
+                    .catch(() => setError(true));
+            }
+        }
+    }, [src, loaded, error]);
     
     return (
         <div className={className} style={{ 
@@ -36,7 +52,7 @@ export const SmartImage = memo(({ src, alt, style, className }) => {
                 </div>
             )}
             <img 
-                src={src} 
+                src={imgSrc} 
                 alt={alt} 
                 onLoad={() => setLoaded(true)} 
                 onError={() => setError(true)}
@@ -45,7 +61,7 @@ export const SmartImage = memo(({ src, alt, style, className }) => {
                     height: '100%', 
                     objectFit: 'cover', 
                     opacity: loaded ? 1 : 0, 
-                    transition: 'opacity 0.5s ease-out, transform 0.5s ease-out', 
+                    transition: loaded && cachedImage ? 'none' : 'opacity 0.5s ease-out, transform 0.5s ease-out', 
                     transform: loaded ? 'scale(1)' : 'scale(1.03)' 
                 }} 
             />

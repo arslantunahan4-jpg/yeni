@@ -1,17 +1,29 @@
 import React, { memo, useState, useRef, useEffect, useCallback } from 'react';
-import { SmartImage, POSTER_IMG, BACKDROP_IMG } from './Shared';
+import { SmartImage, POSTER_IMG } from './Shared';
 import { SoundManager } from '../hooks/useAppLogic';
+import { ImageCache } from '../services/imageCache';
 
 const CARD_WIDTH = 180;
 const CARD_GAP = 16;
 const TRANSITION_DURATION = 300;
 const FRAME_LEFT_OFFSET = 24;
+const PRELOAD_THRESHOLD = 5;
+const PAGINATION_THRESHOLD = 3;
 
-export const TVRow = memo(({ title, data, onSelect, rowId }) => {
+export const TVRow = memo(({ 
+    title, 
+    data, 
+    onSelect, 
+    rowId, 
+    onLoadMore, 
+    hasMore = false,
+    isLoading = false 
+}) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [isFocused, setIsFocused] = useState(false);
     const focusRef = useRef(null);
     const carouselRef = useRef(null);
+    const loadMoreTriggeredRef = useRef(false);
     
     const itemCount = data?.length || 0;
     
@@ -19,19 +31,66 @@ export const TVRow = memo(({ title, data, onSelect, rowId }) => {
         return -(index * (CARD_WIDTH + CARD_GAP));
     }, []);
     
+    useEffect(() => {
+        if (!data || data.length === 0) return;
+        
+        const preloadImages = async () => {
+            const start = Math.max(0, selectedIndex - PRELOAD_THRESHOLD);
+            const end = Math.min(data.length, selectedIndex + PRELOAD_THRESHOLD + 1);
+            
+            const urls = [];
+            for (let i = start; i < end; i++) {
+                const item = data[i];
+                if (item) {
+                    const posterPath = item.poster_path || item.backdrop_path;
+                    if (posterPath) {
+                        urls.push(POSTER_IMG + posterPath);
+                    }
+                }
+            }
+            
+            await ImageCache.preloadBatch(urls);
+        };
+        
+        preloadImages();
+    }, [data, selectedIndex]);
+    
+    useEffect(() => {
+        if (hasMore && onLoadMore && !isLoading && itemCount > 0) {
+            const remainingItems = itemCount - selectedIndex - 1;
+            
+            if (remainingItems <= PAGINATION_THRESHOLD && !loadMoreTriggeredRef.current) {
+                loadMoreTriggeredRef.current = true;
+                onLoadMore();
+            }
+        }
+    }, [selectedIndex, itemCount, hasMore, onLoadMore, isLoading]);
+    
+    useEffect(() => {
+        if (!isLoading) {
+            loadMoreTriggeredRef.current = false;
+        }
+    }, [isLoading, itemCount]);
+    
     const navigateToIndex = useCallback((newIndex) => {
         if (itemCount === 0) return;
         
-        let wrappedIndex = newIndex;
-        if (wrappedIndex < 0) {
-            wrappedIndex = itemCount - 1;
-        } else if (wrappedIndex >= itemCount) {
-            wrappedIndex = 0;
+        let targetIndex = newIndex;
+        
+        if (targetIndex < 0) {
+            targetIndex = 0;
+        } else if (targetIndex >= itemCount) {
+            if (hasMore && onLoadMore && !isLoading) {
+                onLoadMore();
+            }
+            targetIndex = itemCount - 1;
         }
         
-        setSelectedIndex(wrappedIndex);
-        SoundManager.playHover();
-    }, [itemCount]);
+        if (targetIndex !== selectedIndex) {
+            setSelectedIndex(targetIndex);
+            SoundManager.playHover();
+        }
+    }, [itemCount, selectedIndex, hasMore, onLoadMore, isLoading]);
     
     const handleKeyDown = useCallback((e) => {
         if (!isFocused) return;
@@ -151,15 +210,48 @@ export const TVRow = memo(({ title, data, onSelect, rowId }) => {
                     }}
                 >
                     {data.map((movie, index) => {
-                        const isSelected = index === selectedIndex;
-                        const distance = Math.abs(index - selectedIndex);
-                        const opacity = isSelected ? 0 : distance <= 3 ? 1 - (distance * 0.15) : 0.4;
-                        const scale = isSelected ? 0.9 : distance <= 2 ? 1 - (distance * 0.03) : 0.94;
+                        const isBeforeOrSelected = index <= selectedIndex;
+                        const distanceFromSelected = index - selectedIndex;
+                        const isVisible = distanceFromSelected > 0 && distanceFromSelected <= 8;
+                        
+                        if (isBeforeOrSelected) {
+                            return (
+                                <div 
+                                    key={`${movie.id}-${index}`}
+                                    className="tv-row-item"
+                                    style={{
+                                        width: CARD_WIDTH,
+                                        height: 270,
+                                        flexShrink: 0,
+                                        opacity: 0,
+                                        pointerEvents: 'none'
+                                    }}
+                                />
+                            );
+                        }
+                        
+                        if (!isVisible) {
+                            return (
+                                <div 
+                                    key={`${movie.id}-${index}`}
+                                    className="tv-row-item"
+                                    style={{
+                                        width: CARD_WIDTH,
+                                        height: 270,
+                                        flexShrink: 0,
+                                        visibility: 'hidden'
+                                    }}
+                                />
+                            );
+                        }
+                        
+                        const opacity = distanceFromSelected <= 3 ? 1 - ((distanceFromSelected - 1) * 0.15) : 0.4;
+                        const scale = distanceFromSelected <= 2 ? 1 - ((distanceFromSelected - 1) * 0.03) : 0.94;
                         
                         return (
                             <div 
                                 key={`${movie.id}-${index}`}
-                                className={`tv-row-item ${isSelected ? 'tv-row-item-selected' : ''}`}
+                                className="tv-row-item"
                                 onClick={() => handleItemClick(movie, index)}
                                 style={{
                                     opacity,
@@ -185,13 +277,19 @@ export const TVRow = memo(({ title, data, onSelect, rowId }) => {
                             </div>
                         );
                     })}
+                    
+                    {isLoading && (
+                        <div className="tv-row-loading">
+                            <div className="tv-row-loading-spinner" />
+                        </div>
+                    )}
                 </div>
             </div>
             
             {isFocused && (
                 <div className="tv-row-indicator">
                     <span className="tv-row-position">
-                        {selectedIndex + 1} / {itemCount}
+                        {selectedIndex + 1} / {itemCount}{hasMore ? '+' : ''}
                     </span>
                     <div className="tv-row-nav-hint">
                         <span><i className="fas fa-arrow-left"></i> <i className="fas fa-arrow-right"></i> Navigate</span>
