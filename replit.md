@@ -129,6 +129,18 @@ Detaylı bilgi: `ANDROID_BUILD.md`
 
 ## Son Değişiklikler (10 Aralık 2025)
 
+### Geliştirilmiş TV Mode Navigasyon Sistemi
+- **Sabit Frame Kaydırma**: Seçim çerçevesi solda sabit kalır, içerik altından kayar
+  - Seçili öğe ve önceki öğeler gizlenir (sadece çerçevedeki ve sonrakiler görünür)
+- **Sonsuz Sayfalama**: Son 5 öğeye yaklaşınca otomatik yükleme
+  - "Daha Fazla Yükle" butonu yok - tamamen seamless geçiş
+  - Her satır için bağımsız loading state (ref tabanlı guard)
+  - try/finally ile hata durumlarında bile state sıfırlanır
+- **Agresif Görsel Önbellekleme**: 
+  - ImageCache servisi ile bellek içi Image nesnesi önbellekleme
+  - SmartImage önbelleklenmiş Image.src kullanarak anında görüntüleme
+  - Kategoriler arası geçişte görsel yeniden yükleme yok
+
 ### Netflix-style TV Browser UI (TVRow Bileşeni)
 - Yeni TVRow bileşeni eklendi - Netflix tarzı sabit focus frame navigasyonu
 - Sabit focus frame tasarımı: Frame ekranın sol tarafında sabit kalır, içerik ok tuşlarıyla kayar
