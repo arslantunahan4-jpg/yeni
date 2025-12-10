@@ -10,7 +10,8 @@ Apple TV+ benzeri modern bir film ve dizi izleme uygulaması (Türkçe).
 │   │   ├── HomeWidgets.jsx    # Hero carousel ve satır bileşenleri
 │   │   ├── IntroAnimation.jsx # Sinematik açılış animasyonu (The Genesis Sequence)
 │   │   ├── Modals.jsx         # Detay modal ve video oynatıcı
-│   │   └── Shared.jsx         # Ortak bileşenler (NavBar, MobileNav, Card, SmartImage)
+│   │   ├── Shared.jsx         # Ortak bileşenler (NavBar, MobileNav, Card, SmartImage)
+│   │   └── TVRow.jsx          # Netflix-style TV navigasyon bileşeni (sabit focus frame)
 │   ├── hooks/
 │   │   └── useAppLogic.js     # TV navigasyon, API ve depolama hook'ları
 │   ├── assets/                # Statik görsel dosyaları
@@ -126,7 +127,20 @@ Detaylı bilgi: `ANDROID_BUILD.md`
 - Vurgu: #0a84ff (mavi), #30d158 (yeşil)
 - Glass: rgba(255, 255, 255, 0.08-0.15)
 
-## Son Değişiklikler (1 Aralık 2025)
+## Son Değişiklikler (10 Aralık 2025)
+
+### Netflix-style TV Browser UI (TVRow Bileşeni)
+- Yeni TVRow bileşeni eklendi - Netflix tarzı sabit focus frame navigasyonu
+- Sabit focus frame tasarımı: Frame ekranın sol tarafında sabit kalır, içerik ok tuşlarıyla kayar
+- GPU-hızlandırılmış animasyonlar: translate3d ve will-change ile 300ms geçişler
+- Glassmorphism focus frame: backdrop-filter, pulsing border animasyonları
+- Tek focusable element: Tüm klavye olayları focus frame button üzerinden yönetilir
+- Global navigasyon hook güncellemesi: TVRow aktifken sol/sağ ok tuşları çakışması önlendi
+- TV Mode toggle: Navbar'da TV modunu açma/kapama butonu (localStorage ile kalıcı)
+- Hover/select ses efektleri (debounced)
+- Enter tuşu ile içerik seçimi ve detay modal'ı açma
+
+## Önceki Değişiklikler (1 Aralık 2025)
 
 ### TV Uzaktan Kumanda ve Klavye Kontrolleri
 - TV uzaktan kumanda tuş desteği geliştirildi:
